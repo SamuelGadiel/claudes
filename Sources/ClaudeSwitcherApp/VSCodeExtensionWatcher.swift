@@ -1,14 +1,14 @@
 import ClaudeSwitcherCore
 import Foundation
 
-/// Mantém o patch de scope da extensão oficial do VS Code (ver
-/// VSCodeExtensionPatcher) sempre aplicado, reagindo em tempo real quando
+/// Mantém os dois patches da extensão oficial do Claude Code (ver
+/// ClaudePatchCoordinator) sempre aplicados, reagindo em tempo real quando
 /// a extensão é atualizada — sem polling. O usuário deixa o app rodando
 /// indefinidamente na status bar (não reinicia no dia a dia), então rodar
-/// o patch só uma vez no startup não é suficiente: quando o VS Code
+/// os patches só uma vez no startup não é suficiente: quando o VS Code
 /// atualiza a extensão sozinho em background, ela ganha uma pasta nova
-/// (`anthropic.claude-code-<nova-versão>-darwin-arm64`) com o
-/// `package.json` original (scope "machine" de novo).
+/// (`anthropic.claude-code-<nova-versão>-darwin-arm64`) com os arquivos
+/// originais, sem patch nenhum.
 ///
 /// Observa `~/.vscode/extensions` via `DispatchSource` (kqueue) — o mesmo
 /// mecanismo reativo que a própria extensão oficial usa internamente para
@@ -57,15 +57,11 @@ final class VSCodeExtensionWatcher {
     }
 
     private func applyNow() {
-        do {
-            let status = try VSCodeExtensionPatcher.ensurePatched()
-            if !status.wasAlreadyPatched {
-                NSLog("claude-switcher: patch de scope (re)aplicado na extensão Claude \(status.extensionVersion)")
-            }
-        } catch VSCodeExtensionPatchError.extensionNotFound {
-            // Sem VS Code/extensão instalada — nada a fazer.
-        } catch {
-            NSLog("claude-switcher: falha ao verificar/aplicar patch da extensão Claude: \(error)")
+        // .utility: o patch de extension.js pode levar até ~1.6s em casos
+        // raros (retry/backoff contra um update em andamento) — nunca na
+        // main thread.
+        Task.detached(priority: .utility) {
+            await ClaudePatchCoordinator.applyAll(log: true)
         }
     }
 }

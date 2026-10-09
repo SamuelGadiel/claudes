@@ -122,20 +122,16 @@ final class StatusBarController: NSObject {
     /// detectado, só que disparável à mão caso o watcher falhe silenciosamente
     /// por algum motivo não previsto.
     @objc private func reapplyVSCodePatch() {
-        let alert = NSAlert()
-        do {
-            let status = try VSCodeExtensionPatcher.ensurePatched()
-            alert.messageText = status.wasAlreadyPatched ? "Patch já estava aplicado" : "Patch aplicado"
-            alert.informativeText = "Extensão Claude \(status.extensionVersion)."
-            alert.alertStyle = .informational
-        } catch {
-            alert.messageText = "Não consegui aplicar o patch"
-            alert.informativeText = "\(error)"
-            alert.alertStyle = .warning
+        Task { @MainActor in
+            let summary = await ClaudePatchCoordinator.applyAll(log: false)
+            let alert = NSAlert()
+            alert.messageText = summary.hadRealError ? "Patch não aplicado por completo" : "Patch verificado"
+            alert.informativeText = "\(summary.scopeMessage)\n\(summary.jsMessage)"
+            alert.alertStyle = summary.hadRealError ? .warning : .informational
+            alert.addButton(withTitle: "OK")
+            NSApp.activate(ignoringOtherApps: true)
+            alert.runModal()
         }
-        alert.addButton(withTitle: "OK")
-        NSApp.activate(ignoringOtherApps: true)
-        alert.runModal()
     }
 
     @objc private func showAbout() {

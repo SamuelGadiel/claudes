@@ -12,7 +12,8 @@ public enum VSCodeExtensionPatchError: Error, CustomStringConvertible {
         case .extensionNotFound:
             return "extensão anthropic.claude-code não encontrada em ~/.vscode/extensions"
         case .packageJSONUnreadable(let detail):
-            return "não consegui ler o package.json da extensão: \(detail)"
+            return "não consegui ler/decodificar o package.json da extensão mesmo após esperar " +
+                "estabilizar (não é timing de update) — \(detail)"
         case .settingNotFound:
             return "o setting claudeCode.environmentVariables não existe mais no package.json — a extensão pode ter mudado de formato"
         case .unrecognizedScope(let scope):
@@ -27,6 +28,9 @@ public enum VSCodeExtensionPatchError: Error, CustomStringConvertible {
 public struct VSCodeExtensionPatchStatus {
     public let extensionVersion: String
     public let wasAlreadyPatched: Bool
+    /// Não-nil quando pulamos por detectar um update em andamento (arquivo
+    /// vazio/instável) — não é sucesso nem erro, só "tenta de novo depois".
+    public let skippedReason: String?
 }
 
 /// `claudeCode.environmentVariables` (que carrega CLAUDE_CONFIG_DIR) é
@@ -98,15 +102,53 @@ public enum VSCodeExtensionPatcher {
     }
 
     @discardableResult
-    public static func ensurePatched() throws -> VSCodeExtensionPatchStatus {
+    public static func ensurePatched() async throws -> VSCodeExtensionPatchStatus {
         guard let extensionDir = locateExtensionDir() else {
             throw VSCodeExtensionPatchError.extensionNotFound
         }
         let packageJSONPath = extensionDir + "/package.json"
 
-        guard let data = FileManager.default.contents(atPath: packageJSONPath),
-              var root = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-        else {
+        guard FileManager.default.fileExists(atPath: packageJSONPath) else {
+            return VSCodeExtensionPatchStatus(
+                extensionVersion: "desconhecida", wasAlreadyPatched: false,
+                skippedReason: "package.json não encontrado (update em andamento?)"
+            )
+        }
+
+        var text = try await TransientFileIO.readWithRetry(path: packageJSONPath)
+        if text.isEmpty {
+            return VSCodeExtensionPatchStatus(
+                extensionVersion: "desconhecida", wasAlreadyPatched: false,
+                skippedReason: "package.json vazio (update em andamento)"
+            )
+        }
+
+        var parsed = parse(text)
+        // Um arquivo não-vazio mas com JSON inválido pode ser um snapshot
+        // parcial capturado no meio de uma reescrita — observa a
+        // estabilidade antes de declarar um problema real (mesma proteção
+        // que ClaudeExtensionJSPatchRunner já tem para o extension.js).
+        if parsed == nil {
+            let settled = try await TransientFileIO.readUntilStable(path: packageJSONPath, initial: text)
+            if settled.changed {
+                text = settled.source
+                if text.isEmpty {
+                    return VSCodeExtensionPatchStatus(
+                        extensionVersion: "desconhecida", wasAlreadyPatched: false,
+                        skippedReason: "package.json vazio (update em andamento)"
+                    )
+                }
+                parsed = parse(text)
+                if parsed == nil {
+                    return VSCodeExtensionPatchStatus(
+                        extensionVersion: "desconhecida", wasAlreadyPatched: false,
+                        skippedReason: "arquivo ainda instável, tenta de novo depois"
+                    )
+                }
+            }
+        }
+
+        guard var root = parsed else {
             throw VSCodeExtensionPatchError.packageJSONUnreadable(packageJSONPath)
         }
 
@@ -122,7 +164,7 @@ public enum VSCodeExtensionPatcher {
         }
 
         if currentScope == patchedScope {
-            return VSCodeExtensionPatchStatus(extensionVersion: version, wasAlreadyPatched: true)
+            return VSCodeExtensionPatchStatus(extensionVersion: version, wasAlreadyPatched: true, skippedReason: nil)
         }
         guard currentScope == originalScope else {
             throw VSCodeExtensionPatchError.unrecognizedScope(currentScope)
@@ -133,7 +175,9 @@ public enum VSCodeExtensionPatcher {
         // incremental necessário depois disso.
         let backupPath = packageJSONPath + backupSuffix
         if !FileManager.default.fileExists(atPath: backupPath) {
-            try? data.write(to: URL(fileURLWithPath: backupPath))
+            try await TransientFileIO.retryOnTransientLock {
+                try text.write(toFile: backupPath, atomically: true, encoding: .utf8)
+            }
         }
 
         setting["scope"] = patchedScope
@@ -144,11 +188,18 @@ public enum VSCodeExtensionPatcher {
 
         do {
             let patched = try JSONSerialization.data(withJSONObject: root, options: [.prettyPrinted])
-            try patched.write(to: URL(fileURLWithPath: packageJSONPath))
+            try await TransientFileIO.retryOnTransientLock {
+                try patched.write(to: URL(fileURLWithPath: packageJSONPath))
+            }
         } catch {
             throw VSCodeExtensionPatchError.writeFailed("\(error)")
         }
 
-        return VSCodeExtensionPatchStatus(extensionVersion: version, wasAlreadyPatched: false)
+        return VSCodeExtensionPatchStatus(extensionVersion: version, wasAlreadyPatched: false, skippedReason: nil)
+    }
+
+    private static func parse(_ text: String) -> [String: Any]? {
+        guard let data = text.data(using: .utf8) else { return nil }
+        return try? JSONSerialization.jsonObject(with: data) as? [String: Any]
     }
 }

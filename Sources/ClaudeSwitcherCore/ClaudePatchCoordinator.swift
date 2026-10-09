@@ -25,10 +25,14 @@ public enum ClaudePatchCoordinator {
 
         let scopeMessage: String
         do {
-            let status = try VSCodeExtensionPatcher.ensurePatched()
-            scopeMessage = status.wasAlreadyPatched
-                ? "scope já aplicado (extensão \(status.extensionVersion))"
-                : "scope aplicado agora (extensão \(status.extensionVersion))"
+            let status = try await VSCodeExtensionPatcher.ensurePatched()
+            if let reason = status.skippedReason {
+                scopeMessage = "scope pulado (\(reason))"
+            } else {
+                scopeMessage = status.wasAlreadyPatched
+                    ? "scope já aplicado (extensão \(status.extensionVersion))"
+                    : "scope aplicado agora (extensão \(status.extensionVersion))"
+            }
         } catch VSCodeExtensionPatchError.extensionNotFound {
             scopeMessage = "extensão Claude não encontrada"
         } catch {

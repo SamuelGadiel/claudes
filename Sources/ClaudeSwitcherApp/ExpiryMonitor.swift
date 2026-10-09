@@ -13,7 +13,13 @@ final class ExpiryMonitor {
     /// só dispara de novo se a condição for resolvida e voltar a ocorrer.
     private var notifiedKeys: Set<String> = []
 
-    private let checkInterval: TimeInterval = 300
+    // 5min original relia o Keychain de todas as contas com o app inteiro
+    // em background, pra sempre — mesma classe de bug já corrigida no poll
+    // de uso (spec 06), só que neste componente não tinha sido coberta: era
+    // a causa dos prompts de senha do Keychain reaparecendo periodicamente
+    // mesmo com o painel fechado. 6h ainda avisa com folga dentro da janela
+    // de 24h, lendo o Keychain ~72x menos.
+    private let checkInterval: TimeInterval = 6 * 3600
     private let warningWindow: TimeInterval = 24 * 3600
 
     func start() {

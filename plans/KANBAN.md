@@ -8,8 +8,8 @@
 - [ ] **P3/P13** Vendorizar patch do leog + runtime JavaScriptCore para aplicar no `extension.js` da extensão oficial → `specs/03-patch-extensao-vscode` (**adiado de propósito** — usuário continua com a extensão do leog por enquanto)
 - [ ] "Verificar atualizações" real + "Sobre" customizado (hoje são placeholder/painel padrão do macOS) → `specs/05-app-status-bar`
 - [ ] **P9** Validar notificação de expiração visualmente (lógica implementada e correta — `requestAuthorization`/`add()` sem erro quando autorizado — mas falta confirmação visual; bloqueado por uma provável proteção anti-abuso do TCC do macOS contra pedidos de permissão de bundle ids novos em sequência rápida, ver "Bloqueado" abaixo) → `specs/05-app-status-bar`
-- [ ] Ajustar `ClaudeGateway` para resolver o shell de login do usuário quando chamado pela GUI (app lançado via Finder/LaunchServices não herda PATH do terminal) → `specs/07-cli-gateway`
 - [ ] Repassar sinais (Ctrl+C) em sessões longas/`--bg` — funcionou nos testes manuais mas não foi validado exaustivamente → `specs/07-cli-gateway`
+- [ ] **Chats compartilhados** — usuário tem ideias a desenvolver, ainda não discutido a fundo
 - [ ] Empacotar o `.app` de verdade (bundle, ícone, assinatura/notarização, distribuição) → `specs/05-app-status-bar`
 
 ## Em andamento
@@ -71,6 +71,9 @@ _(vazio)_
   - Cor da barra de uso: investigado o bundle JS real do site claude.ai (chunk `shared-8`, função `qF`) — 3 estágios reais (`normal` <75%, `warning` 75–89% em `#fab219`, `critical` ≥90% em `#d03b3b`), bem mais granular que a extensão do VS Code (que só tem 2). Barra customizada (`UsageProgressBar`) substituiu o `ProgressView` nativo — trilha de fundo na mesma cor do estágio, translúcida, batendo com o visual do site
   - Textos de "reinicia": sessão (5h) em formato relativo ("Reinicia em Xh Ymin"), semana em formato absoluto ("Reinicia segunda (12) às 06:00"), replicando a distinção do site
   - Animação de crescimento da barra (0% → valor) restaurada via `@State` + `.id(slug)` — anima do zero ao trocar de aba/abrir o painel, e suavemente entre polls da mesma conta
+- [x] **PATH do login/uso pela GUI**: `ClaudeExecutable` resolve o caminho absoluto do binário `claude` em camadas (PATH herdado → locais comuns de instalação → `ShellPath`, o shell de login do usuário, só como último recurso — chegou a medir **~2s** nesta máquina por causa de plugins de prompt, custo que não pode ser pago em todo `cs` chamado de um terminal que já tem PATH correto). Usado por `ClaudeGateway`, `UsageControlClient` e `LoginSessionController` → `specs/07-cli-gateway`
+- [x] **Auditoria a fundo do fluxo de troca de conta no VS Code** (pedido explícito do usuário antes de remover os profiles): confirmado lendo o `extension.js` real da extensão oficial (2.1.281, não só assumido) que `watchEnvironmentVariablesSetting()` reage a mudanças em `claudeCode.environmentVariables` via `onDidChangeConfiguration` e dá refresh automático em todo webview aberto — **reload manual não é necessário**, fechando a pergunta que ficava em aberto desde a spec 02. Confirmado também que o patch da extensão `leog.claude-code-config-dir-patcher` está de fato aplicado na extensão oficial instalada (existe `extension.js.claude-config-dir-patcher.bak`, tamanho do arquivo mudou) — **essa extensão continua sendo uma dependência necessária** até a spec 03 ser implementada, decisão confirmada pelo usuário → `specs/02-integracao-vscode-sem-profiles`
+- [x] **Primeiro commit do repositório**: histórico organizado em 10 commits atômicos (conventional commits) por domínio — scaffold, storage de contas, integração VS Code, descoberta de projetos/sessões, uso em tempo real, gateway claude, CLI, app GUI, docs, `.clauderc` do próprio projeto. `site/` (bundles JS salvos do claude.ai para investigar cores) ficou fora, adicionado ao `.gitignore`
 
 ## Investigado e descartado
 

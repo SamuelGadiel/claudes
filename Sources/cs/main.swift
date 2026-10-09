@@ -24,6 +24,9 @@ let dateFormatter: DateFormatter = {
     let f = DateFormatter()
     f.dateStyle = .medium
     f.timeStyle = .short
+    // Always English, regardless of the system locale — the whole project
+    // standardizes on English, not just the source code.
+    f.locale = Locale(identifier: "en_US")
     return f
 }()
 

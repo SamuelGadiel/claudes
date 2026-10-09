@@ -82,7 +82,7 @@ final class ExpiryMonitor {
                     notify(
                         key: expiringKey,
                         title: "Session expiring soon: \(account.name)",
-                        body: "Expires \(refreshExpiresAt.formatted(date: .abbreviated, time: .shortened))."
+                        body: "Expires \(refreshExpiresAt.formatted(Date.FormatStyle(date: .abbreviated, time: .shortened, locale: Locale(identifier: "en_US"))))."
                     )
                 } else {
                     notifiedKeys.remove(expiringKey)

@@ -589,7 +589,7 @@ struct PanelView: View {
                     }
                 }
                 if let expiresAt = viewModel.accountStatuses[slug]?.refreshTokenExpiresAt {
-                    Text("Login expires \(expiresAt.formatted(.relative(presentation: .named)))")
+                    Text("Login expires \(expiresAt.formatted(.relative(presentation: .named).locale(Locale(identifier: "en_US"))))")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
@@ -646,7 +646,7 @@ struct PanelView: View {
                     .foregroundStyle(.orange)
                     .fixedSize(horizontal: false, vertical: true)
             } else if let lastUpdated = state?.lastUpdated {
-                Text("updated \(lastUpdated.formatted(.relative(presentation: .named)))")
+                Text("updated \(lastUpdated.formatted(.relative(presentation: .named).locale(Locale(identifier: "en_US"))))")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }

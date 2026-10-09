@@ -1,3 +1,4 @@
+import ClaudeSwitcherCore
 import Cocoa
 import Combine
 import SwiftUI
@@ -92,16 +93,20 @@ final class StatusBarController: NSObject {
         let checkUpdates = NSMenuItem(
             title: "Verificar atualizações", action: #selector(checkForUpdates), keyEquivalent: ""
         )
+        let reapplyVSCodePatch = NSMenuItem(
+            title: "Reaplicar patch no VS Code", action: #selector(reapplyVSCodePatch), keyEquivalent: ""
+        )
         let about = NSMenuItem(
             title: "Sobre o Claude Switcher", action: #selector(showAbout), keyEquivalent: ""
         )
         let quit = NSMenuItem(title: "Sair", action: #selector(quit), keyEquivalent: "q")
 
-        for item in [checkUpdates, about, quit] {
+        for item in [checkUpdates, reapplyVSCodePatch, about, quit] {
             item.target = self
         }
 
         rightClickMenu.addItem(checkUpdates)
+        rightClickMenu.addItem(reapplyVSCodePatch)
         rightClickMenu.addItem(about)
         rightClickMenu.addItem(.separator())
         rightClickMenu.addItem(quit)
@@ -109,6 +114,28 @@ final class StatusBarController: NSObject {
 
     @objc private func checkForUpdates() {
         // TODO: implementar checagem real de atualização (spec 07, empacotamento).
+    }
+
+    /// Fallback manual enquanto `VSCodeExtensionWatcher` (reativo, via
+    /// DispatchSource) ainda não foi validado em uso real — mesma correção
+    /// que já roda sozinha no startup e a cada update da extensão
+    /// detectado, só que disparável à mão caso o watcher falhe silenciosamente
+    /// por algum motivo não previsto.
+    @objc private func reapplyVSCodePatch() {
+        let alert = NSAlert()
+        do {
+            let status = try VSCodeExtensionPatcher.ensurePatched()
+            alert.messageText = status.wasAlreadyPatched ? "Patch já estava aplicado" : "Patch aplicado"
+            alert.informativeText = "Extensão VS Code \(status.extensionVersion)."
+            alert.alertStyle = .informational
+        } catch {
+            alert.messageText = "Não consegui aplicar o patch"
+            alert.informativeText = "\(error)"
+            alert.alertStyle = .warning
+        }
+        alert.addButton(withTitle: "OK")
+        NSApp.activate(ignoringOtherApps: true)
+        alert.runModal()
     }
 
     @objc private func showAbout() {

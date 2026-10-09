@@ -17,6 +17,9 @@ final class StatusBarController: NSObject {
     /// togglePopover().
     private let viewModel = PanelViewModel()
     private var cancellables: Set<AnyCancellable> = []
+    private let launchAtLoginItem = NSMenuItem(
+        title: "Iniciar ao fazer login", action: #selector(toggleLaunchAtLogin), keyEquivalent: ""
+    )
 
     override init() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
@@ -57,6 +60,7 @@ final class StatusBarController: NSObject {
             .store(in: &cancellables)
 
         popover.delegate = self
+        rightClickMenu.delegate = self
         setUpRightClickMenu()
     }
 
@@ -101,12 +105,13 @@ final class StatusBarController: NSObject {
         )
         let quit = NSMenuItem(title: "Sair", action: #selector(quit), keyEquivalent: "q")
 
-        for item in [checkUpdates, reapplyVSCodePatch, about, quit] {
+        for item in [checkUpdates, reapplyVSCodePatch, launchAtLoginItem, about, quit] {
             item.target = self
         }
 
         rightClickMenu.addItem(checkUpdates)
         rightClickMenu.addItem(reapplyVSCodePatch)
+        rightClickMenu.addItem(launchAtLoginItem)
         rightClickMenu.addItem(about)
         rightClickMenu.addItem(.separator())
         rightClickMenu.addItem(quit)
@@ -114,6 +119,20 @@ final class StatusBarController: NSObject {
 
     @objc private func checkForUpdates() {
         // TODO: implementar checagem real de atualização (spec 07, empacotamento).
+    }
+
+    @objc private func toggleLaunchAtLogin() {
+        do {
+            try LaunchAtLoginManager.setEnabled(!LaunchAtLoginManager.isEnabled)
+        } catch {
+            let alert = NSAlert()
+            alert.messageText = "Não consegui alterar isso"
+            alert.informativeText = "\(error)"
+            alert.alertStyle = .warning
+            alert.addButton(withTitle: "OK")
+            NSApp.activate(ignoringOtherApps: true)
+            alert.runModal()
+        }
     }
 
     /// Fallback manual enquanto `VSCodeExtensionWatcher` (reativo, via
@@ -158,5 +177,15 @@ extension StatusBarController: NSPopoverDelegate {
     /// togglePopover().
     func popoverDidClose(_ notification: Notification) {
         viewModel.stopPolling()
+    }
+}
+
+extension StatusBarController: NSMenuDelegate {
+    /// SMAppService.mainApp.status é a fonte de verdade — relida toda vez
+    /// que o menu abre, em vez de manter um @Published próprio que poderia
+    /// dessincronizar (ex.: usuário desativa pelo painel de Itens de Login
+    /// do macOS, fora do nosso controle).
+    func menuWillOpen(_ menu: NSMenu) {
+        launchAtLoginItem.state = LaunchAtLoginManager.isEnabled ? .on : .off
     }
 }

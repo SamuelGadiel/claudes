@@ -13,10 +13,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         monitor.start()
         expiryMonitor = monitor
 
-        // Usuário deixa o app rodando indefinidamente na status bar — não
-        // basta aplicar o patch uma vez no startup, precisa continuar
-        // observando pra reagir quando o VS Code atualizar a extensão
-        // sozinho em background.
+        // The user leaves the app running indefinitely in the status bar — it's
+        // not enough to apply the patch once at startup, it needs to keep
+        // watching to react when VS Code updates the extension
+        // on its own in the background.
         let watcher = VSCodeExtensionWatcher()
         watcher.start()
         vscodeExtensionWatcher = watcher

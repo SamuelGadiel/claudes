@@ -1,10 +1,10 @@
 import ClaudeSwitcherCore
 import Foundation
 
-/// Controla `claude auth login` diretamente (stdin/stdout via Pipe, sem
-/// terminal visível) — login continua 100% delegado ao binário oficial,
-/// nós só repassamos o código que o usuário cola de volta para o processo
-/// que já está esperando por ele. Nunca implementamos nada de OAuth aqui.
+/// Controls `claude auth login` directly (stdin/stdout via Pipe, no
+/// visible terminal) — login remains 100% delegated to the official binary,
+/// we only pass the code the user pastes back to the process
+/// that's already waiting for it. We never implement any OAuth here.
 @MainActor
 final class LoginSessionController: ObservableObject {
     enum State: Equatable {
@@ -59,18 +59,18 @@ final class LoginSessionController: ObservableObject {
         do {
             try process.run()
         } catch {
-            state = .failure("Não consegui iniciar o login: \(error)")
+            state = .failure("Could not start login: \(error)")
         }
     }
 
     private func handleOutput(_ text: String) {
         outputBuffer += text
         guard case .starting = state else { return }
-        // "claude auth login" abre o browser sozinho e, em seguida, mostra
-        // um prompt pedindo o código colado de volta — assim que vemos
-        // qualquer sinal de que está esperando, mostramos o campo. Não
-        // tentamos extrair a URL do texto: ela vem com sequências de escape
-        // de hyperlink do terminal (OSC 8), ficaria ilegível exibida crua.
+        // "claude auth login" opens the browser on its own and then shows
+        // a prompt asking for the code to be pasted back — as soon as we see
+        // any sign that it's waiting, we show the field. We don't
+        // try to extract the URL from the text: it comes with terminal
+        // hyperlink escape sequences (OSC 8), it would be unreadable shown raw.
         let lower = outputBuffer.lowercased()
         guard lower.contains("paste") || lower.contains("code") else { return }
         state = .waitingForCode
@@ -88,14 +88,14 @@ final class LoginSessionController: ObservableObject {
         if status == 0 {
             state = .success
         } else if state != .idle {
-            state = .failure("O processo de login terminou com código \(status).")
+            state = .failure("The login process exited with code \(status).")
         }
     }
 
-    /// Nunca mata o processo no meio de uma escrita de credencial — se o
-    /// usuário cancela antes de colar o código, o processo ainda não
-    /// começou a gravar nada sensível, então terminate() aqui é seguro
-    /// (diferente de CredentialRefresher).
+    /// Never kills the process in the middle of writing a credential — if the
+    /// user cancels before pasting the code, the process hasn't
+    /// started writing anything sensitive yet, so terminate() here is safe
+    /// (unlike CredentialRefresher).
     func cancel() {
         if let process, process.isRunning {
             process.terminate()

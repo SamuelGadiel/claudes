@@ -13,14 +13,14 @@ public enum SessionSyncError: Error, CustomStringConvertible {
     public var description: String {
         switch self {
         case .sourceNotFound(let path):
-            return "nenhuma sessão encontrada em \(path) — essa conta nunca usou esse projeto"
+            return "no session found at \(path) — this account has never used this project"
         }
     }
 }
 
-/// Sync-on-switch: copia os .jsonl de sessão de um projeto específico de uma
-/// conta para outra. Nunca symlink, nunca sobrescreve, nunca é automático —
-/// decisão registrada em plans/specs/04-sincronizacao-sessoes.
+/// Sync-on-switch: copies the session .jsonl files of a specific project from
+/// one account to another. Never a symlink, never overwrites, never automatic —
+/// decision recorded in plans/specs/04-sincronizacao-sessoes.
 public enum SessionSync {
     public static func sync(
         projectPath: String, from fromAccount: RegisteredAccount, to toAccount: RegisteredAccount
@@ -50,10 +50,10 @@ public enum SessionSync {
             let destPath = destDir + "/" + file
 
             if fm.fileExists(atPath: destPath) {
-                // Nunca sobrescreve: o nome é o sessionId (UUID), então um
-                // conflito real de conteúdo não deveria ocorrer — mas se
-                // ocorrer, preservar o que já está no destino é mais seguro
-                // do que arriscar perder uma sessão em andamento.
+                // Never overwrites: the name is the sessionId (UUID), so a
+                // real content conflict shouldn't occur — but if it
+                // does, preserving what's already at the destination is safer
+                // than risking the loss of a session in progress.
                 skipped.append(file)
                 continue
             }

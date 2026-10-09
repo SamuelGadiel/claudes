@@ -1,9 +1,9 @@
 import Foundation
 
-/// .clauderc na raiz do projeto: { "account": "<slug>" }.
-/// Grava o nome lógico da conta, nunca um path — por isso é seguro commitar
-/// (cada pessoa resolve o slug para o próprio accounts.json local).
-/// Ver plans/specs/02-integracao-vscode-sem-profiles.
+/// .clauderc at the project root: { "account": "<slug>" }.
+/// Stores the account's logical name, never a path — which is why it's safe to
+/// commit (each person resolves the slug against their own local accounts.json).
+/// See plans/specs/02-integracao-vscode-sem-profiles.
 struct ClauderC: Codable {
     var account: String
 }
@@ -16,8 +16,8 @@ public enum ClauderFile {
         public let account: String
     }
 
-    /// Sobe diretórios a partir de `dir` até achar um .clauderc, igual à
-    /// forma como o git resolve .git subindo até a raiz do repositório.
+    /// Walks up directories starting from `dir` until it finds a .clauderc, the
+    /// same way git resolves .git by walking up to the repository root.
     public static func find(startingAt dir: String) -> Found? {
         let fm = FileManager.default
         var current = (dir as NSString).standardizingPath

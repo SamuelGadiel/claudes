@@ -1,10 +1,10 @@
 import Foundation
 
-/// Resolve o PATH real do shell de login do usuário — único recurso contra
-/// o PATH mínimo que um app GUI lançado via Finder/LaunchServices herda do
-/// launchd. Caro: mede ~2s nesta máquina (oh-my-zsh/powerlevel10k no
-/// `.zshrc`) — por isso só é chamado como último recurso por
-/// `ClaudeExecutable`, nunca direto por quem só precisa rodar `claude`.
+/// Resolves the real PATH of the user's login shell — the only recourse against
+/// the minimal PATH that a GUI app launched via Finder/LaunchServices inherits from
+/// launchd. Expensive: measures ~2s on this machine (oh-my-zsh/powerlevel10k in
+/// `.zshrc`) — that's why it's only called as a last resort by
+/// `ClaudeExecutable`, never directly by anyone who just needs to run `claude`.
 enum ShellPath {
     private static var cached: String?
 
@@ -15,9 +15,9 @@ enum ShellPath {
         return resolved
     }
 
-    /// Mais confiável que a env var `$SHELL` para um app GUI (que não herda
-    /// o ambiente do terminal do usuário) — lê direto da base de usuários
-    /// do sistema.
+    /// More reliable than the `$SHELL` env var for a GUI app (which doesn't
+    /// inherit the user's terminal environment) — reads directly from the
+    /// system's user database.
     static func loginShell() -> String {
         guard let pw = getpwuid(getuid()) else { return "/bin/zsh" }
         return String(cString: pw.pointee.pw_shell)
@@ -26,15 +26,15 @@ enum ShellPath {
     private static func resolve() -> String {
         let fallback = ProcessInfo.processInfo.environment["PATH"] ?? "/usr/bin:/bin:/usr/sbin:/sbin"
         let shell = loginShell()
-        // Delimitador único em volta do valor real — um shell interativo (-i)
-        // pode imprimir banners/MOTD de plugins (oh-my-zsh, starship etc.)
-        // antes do nosso echo; sem isso, esse ruído poluiria o PATH extraído.
+        // Unique delimiter around the real value — an interactive shell (-i)
+        // may print banners/MOTD from plugins (oh-my-zsh, starship, etc.)
+        // before our echo; without this, that noise would pollute the extracted PATH.
         let marker = "__cs_path__"
 
         let process = Process()
         process.executableURL = URL(fileURLWithPath: shell)
-        // -i carrega .zshrc/.bashrc, -l carrega .zprofile — entre os dois
-        // cobrem onde a maioria das pessoas exporta PATH.
+        // -i loads .zshrc/.bashrc, -l loads .zprofile — between the two
+        // they cover where most people export PATH.
         process.arguments = ["-ilc", "echo \"\(marker):$PATH\""]
         process.standardInput = FileHandle.nullDevice
         process.standardError = FileHandle.nullDevice
@@ -50,8 +50,8 @@ enum ShellPath {
 
         let semaphore = DispatchSemaphore(value: 0)
         process.terminationHandler = { _ in semaphore.signal() }
-        // Shell de login mal configurado poderia travar esperando algo —
-        // nunca deixamos isso pendurar a resolução indefinidamente.
+        // A misconfigured login shell could hang waiting for something —
+        // we never let that hang the resolution indefinitely.
         if semaphore.wait(timeout: .now() + 5) == .timedOut, process.isRunning {
             process.terminate()
             return fallback

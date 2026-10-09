@@ -41,29 +41,29 @@ final class PanelViewModel: ObservableObject {
     @Published var newAccountName = ""
     @Published var newAccountSlug = ""
     @Published var addAccountError: String?
-    /// Enquanto o usuário não edita o slug manualmente, ele acompanha o
-    /// nome digitado. Uma vez editado à mão, para de ser sobrescrito.
+    /// While the user hasn't manually edited the slug, it tracks the
+    /// typed name. Once edited by hand, it stops being overwritten.
     private var slugManuallyEdited = false
-    /// Lido do Keychain (local, rápido) — usado para saber se vale a pena
-    /// tentar buscar uso. Sem isso, uma conta nunca logada faria
-    /// UsageControlClient travar esperando um fluxo de login interativo que
-    /// nunca chegaria (processo preso até o timeout).
+    /// Read from the Keychain (local, fast) — used to know whether it's worth
+    /// trying to fetch usage. Without this, an account never logged in would make
+    /// UsageControlClient hang waiting for an interactive login flow that would
+    /// never arrive (process stuck until timeout).
     @Published var accountStatuses: [String: AccountStatus] = [:]
-    /// E-mail/organização/plano — vem de `claude auth status`, não do
-    /// Keychain (que não tem e-mail). Carregado uma vez por conta (nunca
-    /// muda sozinho), não repetido a cada poll de uso.
+    /// Email/organization/plan — comes from `claude auth status`, not the
+    /// Keychain (which has no email). Loaded once per account (never
+    /// changes on its own), not repeated on every usage poll.
     @Published var authInfoStates: [String: AccountAuthInfo] = [:]
-    /// true enquanto o fluxo de login está ativo — nesse período o popover
-    /// não deve fechar sozinho (o `claude auth login` abre o browser, que
-    /// rouba o foco, e o fim do login relê o Keychain, que pode pedir
-    /// senha). Observado pelo StatusBarController para trocar o `behavior`
-    /// do NSPopover. Fora desse período, o popover fecha normalmente ao
-    /// clicar fora, como qualquer painel desse tipo.
+    /// true while the login flow is active — during that period the popover
+    /// should not close on its own (`claude auth login` opens the browser, which
+    /// steals focus, and the end of login re-reads the Keychain, which may prompt
+    /// for a password). Observed by StatusBarController to switch the
+    /// NSPopover's `behavior`. Outside that period, the popover closes normally
+    /// when clicking outside, like any panel of this kind.
     @Published var keepPopoverOpen = false
 
-    /// Relê o uso da aba selecionada periodicamente enquanto o painel está
-    /// aberto — barato (subprocesso local via UsageControlClient, nunca
-    /// rede/HTTP), mas não há razão para fazer isso com o popover fechado.
+    /// Periodically re-reads the usage of the selected tab while the panel is
+    /// open — cheap (local subprocess via UsageControlClient, never
+    /// network/HTTP), but there's no reason to do this with the popover closed.
     private let pollInterval: TimeInterval = 30
     private var pollTimer: Timer?
 
@@ -74,13 +74,13 @@ final class PanelViewModel: ObservableObject {
         warmUpKeychain()
     }
 
-    /// Lê o status (Keychain) de cada conta registrada assim que o app abre,
-    /// antes de qualquer popover estar na tela — uma única leitura por
-    /// conta, cacheada em `accountStatuses`. `refresh()` depois nunca relê o
-    /// Keychain de uma conta que já está nesse cache, só de uma recém-criada.
-    /// Em seguida já dispara o carregamento do uso de todas as contas —
-    /// pelo tempo que o usuário clicar no ícone, os dados já devem estar
-    /// prontos, sem esperar o popover abrir para começar a buscar.
+    /// Reads the status (Keychain) of each registered account as soon as the app
+    /// opens, before any popover is on screen — a single read per
+    /// account, cached in `accountStatuses`. `refresh()` afterward never re-reads
+    /// the Keychain for an account already in this cache, only for a newly created one.
+    /// It then already triggers loading the usage of all accounts —
+    /// by the time the user clicks the icon, the data should already be
+    /// ready, without waiting for the popover to open to start fetching.
     private func warmUpKeychain() {
         Task.detached(priority: .utility) {
             let (file, _) = AccountsConfig.load()
@@ -97,9 +97,9 @@ final class PanelViewModel: ObservableObject {
         }
     }
 
-    /// Relê o Keychain para uma única conta — usado quando sabemos que o
-    /// status dela especificamente pode ter mudado (ex: login acabou de
-    /// terminar), sem reconsultar todas as outras de novo.
+    /// Re-reads the Keychain for a single account — used when we know its
+    /// status specifically may have changed (e.g. login just
+    /// finished), without re-querying all the others again.
     func refreshStatus(slug: String) {
         guard let account = accounts.first(where: { $0.slug == slug }) else { return }
         accountStatuses[slug] = AccountDiscovery.status(for: account)
@@ -123,57 +123,57 @@ final class PanelViewModel: ObservableObject {
                 let target = ((session.configDirFromEnv ?? expandedDefault) as NSString).expandingTildeInPath
                 let label = accounts.first {
                     ($0.configDir as NSString).expandingTildeInPath == target
-                }?.name ?? "conta não registrada"
+                }?.name ?? "unregistered account"
                 return TerminalSessionInfo(pid: session.pid, cwd: cwd, accountLabel: label)
             }
 
-        // Só consulta o Keychain para contas ainda não cacheadas (novas) —
-        // evita reler credenciais já conhecidas a cada refresh() e, com
-        // isso, prompts de autorização repetidos.
+        // Only queries the Keychain for not-yet-cached (new) accounts —
+        // avoids re-reading already-known credentials on every refresh() and,
+        // with that, repeated authorization prompts.
         for account in accounts where accountStatuses[account.slug] == nil {
             accountStatuses[account.slug] = AccountDiscovery.status(for: account)
         }
     }
 
-    /// true quando não há credencial legível no Keychain para essa conta —
-    /// conta recém-criada e nunca logada, ou revogada por completo.
+    /// true when there's no readable credential in the Keychain for this account —
+    /// a newly created and never logged-in account, or one fully revoked.
     func needsLogin(slug: String) -> Bool {
         accountStatuses[slug]?.error != nil
     }
 
     func accountName(forSlug slug: String?) -> String {
         guard let slug, let account = accounts.first(where: { $0.slug == slug }) else {
-            return "sem conta definida"
+            return "no account set"
         }
         return account.name
     }
 
-    /// Troca a conta de um projeto (.clauderc + .vscode/settings.json —
-    /// mesmo fluxo de `cs set`). Sincronização de sessão (spec 04) ainda
-    /// não está encadeada aqui — ver kanban.
+    /// Switches the account of a project (.clauderc + .vscode/settings.json —
+    /// same flow as `cs set`). Session sync (spec 04) is still
+    /// not wired in here — see kanban.
     func switchAccount(project: ProjectInfo, to newAccount: RegisteredAccount) {
         do {
             try ClauderFile.write(accountSlug: newAccount.slug, inDir: project.path)
             let result = try VSCodeSettings.setConfigDir(projectPath: project.path, configDir: newAccount.configDir)
-            statusMessage = "\(project.name) agora usa \(newAccount.name)"
+            statusMessage = "\(project.name) now uses \(newAccount.name)"
             for warning in result.warnings {
                 statusMessage? += " — \(warning)"
             }
         } catch {
-            statusMessage = "Erro ao trocar \(project.name): \(error)"
+            statusMessage = "Error switching \(project.name): \(error)"
         }
         refresh()
     }
 
-    /// Não é possível alterar o ambiente de um processo já em execução —
-    /// isso só grava o .clauderc do diretório, valendo na próxima vez que
-    /// claude/cs for rodado ali. Ver plans/specs/05-app-status-bar.
+    /// It's not possible to change the environment of an already-running process —
+    /// this only writes the directory's .clauderc, taking effect next time
+    /// claude/cs is run there. See plans/specs/05-app-status-bar.
     func switchTerminalSessionAccount(session: TerminalSessionInfo, to newAccount: RegisteredAccount) {
         do {
             try ClauderFile.write(accountSlug: newAccount.slug, inDir: session.cwd)
-            statusMessage = "\(session.cwd) vai usar \(newAccount.name) na próxima execução (sessão atual, pid \(session.pid), continua com a conta antiga)"
+            statusMessage = "\(session.cwd) will use \(newAccount.name) on the next run (the current session, pid \(session.pid), keeps the old account)"
         } catch {
-            statusMessage = "Erro ao gravar .clauderc em \(session.cwd): \(error)"
+            statusMessage = "Error writing .clauderc at \(session.cwd): \(error)"
         }
         refresh()
     }
@@ -199,8 +199,8 @@ final class PanelViewModel: ObservableObject {
         addAccountError = nil
     }
 
-    /// Chamado pelo TextField de nome — enquanto o slug não foi editado à
-    /// mão, ele é recalculado a partir do nome a cada tecla.
+    /// Called by the name TextField — while the slug hasn't been edited by
+    /// hand, it's recalculated from the name on every keystroke.
     func setAccountName(_ name: String) {
         newAccountName = name
         if !slugManuallyEdited {
@@ -208,17 +208,17 @@ final class PanelViewModel: ObservableObject {
         }
     }
 
-    /// Chamado pelo TextField de slug — marca edição manual, para o slug
-    /// parar de ser sobrescrito automaticamente pelo nome a partir daqui.
+    /// Called by the slug TextField — marks manual editing, so the slug
+    /// stops being automatically overwritten by the name from here on.
     func setAccountSlugManually(_ slug: String) {
         newAccountSlug = slug
         slugManuallyEdited = true
     }
 
-    /// Mesma lógica de `cs add` (Core compartilhado — specs/05). Login não
-    /// acontece aqui: o usuário aciona pelo botão "Fazer login" do painel.
-    /// Conta recém-criada nunca tem credencial no Keychain ainda — o status
-    /// é conhecido de antemão, sem precisar consultar o Keychain por ela.
+    /// Same logic as `cs add` (shared Core — specs/05). Login doesn't
+    /// happen here: the user triggers it via the panel's "Log In" button.
+    /// A newly created account never has a credential in the Keychain yet — the
+    /// status is known in advance, without needing to query the Keychain for it.
     func confirmAddAccount() {
         do {
             let trimmedSlug = newAccountSlug.trimmingCharacters(in: .whitespaces)
@@ -245,10 +245,10 @@ final class PanelViewModel: ObservableObject {
             usageStates[account.slug] = nil
             accountStatuses[account.slug] = nil
             refresh()
-            // A aba exibida sempre cai para a primeira conta restante (ver
-            // `selectedAccount` na View) — sem re-selecionar explicitamente
-            // aqui, o uso dela nunca é buscado, porque loadUsage só roda a
-            // partir de `selectAccount`.
+            // The displayed tab always falls back to the first remaining account
+            // (see `selectedAccount` in the View) — without explicitly re-selecting
+            // here, its usage is never fetched, because loadUsage only runs
+            // from `selectAccount`.
             if wasSelected {
                 if let fallback = accounts.first {
                     selectAccount(fallback.slug)
@@ -257,19 +257,19 @@ final class PanelViewModel: ObservableObject {
                 }
             }
         } catch {
-            statusMessage = "Erro ao remover '\(account.name)': \(error)"
+            statusMessage = "Error removing '\(account.name)': \(error)"
         }
     }
 
-    /// Busca o uso sob demanda via UsageControlClient (invoca o próprio
-    /// `claude` no protocolo de controle que a extensão oficial usa — ver
-    /// specs/06). Síncrono/bloqueante por natureza (spawna um subprocesso),
-    /// por isso roda fora da main thread.
+    /// Fetches usage on demand via UsageControlClient (invokes `claude`
+    /// itself in the control protocol the official extension uses — see
+    /// specs/06). Synchronous/blocking by nature (spawns a subprocess),
+    /// so it runs off the main thread.
     func loadUsage(slug: String) {
         guard let account = accounts.first(where: { $0.slug == slug }) else { return }
         guard usageStates[slug]?.isLoading != true else { return }
-        // Sem credencial, get_usage ficaria preso esperando um fluxo de
-        // login interativo que nunca chega — nem tenta.
+        // Without a credential, get_usage would get stuck waiting for an
+        // interactive login flow that never arrives — don't even try.
         guard !needsLogin(slug: slug) else { return }
 
         usageStates[slug, default: AccountUsageState()].isLoading = true
@@ -293,21 +293,21 @@ final class PanelViewModel: ObservableObject {
         }
     }
 
-    /// Chamado pelo StatusBarController toda vez que o popover abre — não dá
-    /// para confiar em `.onAppear` da SwiftUI view para isso: um NSPopover
-    /// reaberto não necessariamente remonta a hierarquia (a NSHostingController
-    /// fica viva em memória, só a NSView some/aparece), então sem isso a
-    /// lista de projetos/sessões ficava presa no estado da primeira abertura
-    /// — um projeto aberto no VS Code depois disso só aparecia reiniciando
-    /// o app inteiro.
+    /// Called by StatusBarController every time the popover opens — you can't
+    /// rely on the SwiftUI view's `.onAppear` for this: a reopened NSPopover
+    /// doesn't necessarily remount the hierarchy (the NSHostingController
+    /// stays alive in memory, only the NSView disappears/appears), so without this
+    /// the project/session list stayed stuck in the state of the first opening
+    /// — a project opened in VS Code after that would only show up by restarting
+    /// the whole app.
     func prepareForDisplay() {
         refresh()
         if selectedAccountSlug == nil {
             selectedAccountSlug = accounts.first?.slug
         }
-        // Sempre recarrega todas as contas ao abrir o painel — antes só
-        // recarregava a aba selecionada, e só se o usuário trocasse de aba
-        // (selectAccount), nunca ao simplesmente reabrir o popover.
+        // Always reloads all accounts when the panel opens — before it only
+        // reloaded the selected tab, and only if the user switched tabs
+        // (selectAccount), never when simply reopening the popover.
         loadUsageForAllAccounts()
         loadAuthInfoForAllAccounts()
         startPolling()
@@ -325,9 +325,9 @@ final class PanelViewModel: ObservableObject {
         }
     }
 
-    /// E-mail/plano não mudam sozinhos — carregado uma vez por conta e
-    /// cacheado, nunca repetido a cada poll de uso. `refreshStatus`/login
-    /// bem-sucedido invalidam o cache quando pode de fato ter mudado.
+    /// Email/plan don't change on their own — loaded once per account and
+    /// cached, never repeated on every usage poll. `refreshStatus`/a successful
+    /// login invalidate the cache when it may actually have changed.
     func loadAuthInfo(slug: String) {
         guard authInfoStates[slug] == nil else { return }
         guard let account = accounts.first(where: { $0.slug == slug }) else { return }
@@ -360,11 +360,11 @@ final class PanelViewModel: ObservableObject {
     }
 }
 
-/// Barra customizada (em vez do ProgressView nativo) porque precisamos da
-/// trilha de fundo na mesma cor do preenchimento, só translúcida — é assim
-/// que o claude.ai mostra (fundo azul escuro sob a barra azul, laranja
-/// escuro sob a barra de warning etc.), diferente do cinza neutro padrão
-/// do ProgressView do macOS.
+/// Custom bar (instead of the native ProgressView) because we need the
+/// background track to be the same color as the fill, just translucent — that's
+/// how claude.ai shows it (dark blue background under the blue bar, dark
+/// orange under the warning bar, etc.), unlike macOS's ProgressView
+/// default neutral gray.
 private struct UsageProgressBar: View {
     let pct: Double
     let color: Color
@@ -403,10 +403,10 @@ struct PanelView: View {
                 .padding()
                 .frame(width: 320)
                 .onChange(of: loginSession.state) { newState in
-                    // Sucesso sem precisar do código manual (comum: o
-                    // callback do browser já confirma sozinho) não deveria
-                    // exigir nem um clique extra, nem uma tela intermediária
-                    // — vai direto para a aba da conta já com o uso carregando.
+                    // Success without needing the manual code (common: the
+                    // browser callback already confirms on its own) shouldn't
+                    // require an extra click or an intermediate screen
+                    // — goes straight to the account tab with usage already loading.
                     guard newState == .success else { return }
                     dismissLoginSession()
                 }
@@ -427,11 +427,11 @@ struct PanelView: View {
 
     private var mainContent: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Projetos abertos (VS Code)")
+            Text("Open Projects (VS Code)")
                 .font(.headline)
 
             if viewModel.projects.isEmpty {
-                Text("Nenhum projeto aberto")
+                Text("No projects open")
                     .foregroundStyle(.secondary)
             } else {
                 ForEach(viewModel.projects) { project in
@@ -441,7 +441,7 @@ struct PanelView: View {
 
             if !viewModel.terminalSessions.isEmpty {
                 Divider()
-                Text("Sessões de terminal")
+                Text("Terminal Sessions")
                     .font(.headline)
                 ForEach(viewModel.terminalSessions) { session in
                     terminalSessionRow(session)
@@ -459,14 +459,14 @@ struct PanelView: View {
             Divider()
 
             HStack {
-                Text("Contas")
+                Text("Accounts")
                     .font(.headline)
                 Spacer()
                 if !viewModel.isAddingAccount {
                     Menu {
-                        Button("Adicionar conta…") { viewModel.startAddingAccount() }
+                        Button("Add Account…") { viewModel.startAddingAccount() }
                         if let account = selectedAccount {
-                            Button("Remover \"\(account.name)\"", role: .destructive) {
+                            Button("Remove \"\(account.name)\"", role: .destructive) {
                                 confirmAndRemove(account)
                             }
                         }
@@ -483,7 +483,7 @@ struct PanelView: View {
             }
 
             if viewModel.accounts.isEmpty {
-                Text("Nenhuma conta registrada")
+                Text("No accounts registered")
                     .foregroundStyle(.secondary)
             } else {
                 Picker("", selection: accountSelectionBinding) {
@@ -502,16 +502,16 @@ struct PanelView: View {
     }
 
     private func confirmAndRemove(_ account: RegisteredAccount) {
-        // NSAlert é uma janela do sistema separada — abri-la rouba o foco
-        // do popover, e com .transient isso fecharia o painel sozinho antes
-        // mesmo do usuário decidir (mesmo caso do prompt de Keychain no
-        // login). keepPopoverOpen segura o painel até a decisão.
+        // NSAlert is a separate system window — opening it steals the popover's
+        // focus, and with .transient that would close the panel on its own before
+        // the user even decides (same case as the Keychain prompt during
+        // login). keepPopoverOpen holds the panel open until the decision is made.
         viewModel.keepPopoverOpen = true
         let confirmed = ConfirmationAlert.confirmDestructive(
-            title: "Remover \"\(account.name)\"?",
-            message: "Isso apaga o diretório da conta (\(account.configDir)) e a credencial no Keychain. "
-                + "Não dá pra desfazer — se quiser usar essa conta de novo, vai precisar fazer login do zero.",
-            confirmTitle: "Remover"
+            title: "Remove \"\(account.name)\"?",
+            message: "This deletes the account's directory (\(account.configDir)) and the credential in the Keychain. "
+                + "It cannot be undone — if you want to use this account again, you'll need to log in from scratch.",
+            confirmTitle: "Remove"
         )
         viewModel.keepPopoverOpen = false
         if confirmed {
@@ -530,14 +530,14 @@ struct PanelView: View {
     private var addAccountForm: some View {
         VStack(alignment: .leading, spacing: 6) {
             TextField(
-                "Nome da conta (ex.: Cliente X)",
+                "Account name (e.g.: Client X)",
                 text: Binding(get: { viewModel.newAccountName }, set: { viewModel.setAccountName($0) })
             )
             .textFieldStyle(.roundedBorder)
             .onSubmit { viewModel.confirmAddAccount() }
 
             TextField(
-                "Slug (identificador, ex.: cliente-x)",
+                "Slug (identifier, e.g.: client-x)",
                 text: Binding(get: { viewModel.newAccountSlug }, set: { viewModel.setAccountSlugManually($0) })
             )
             .textFieldStyle(.roundedBorder)
@@ -552,9 +552,9 @@ struct PanelView: View {
             }
 
             HStack {
-                Button("Cancelar") { viewModel.cancelAddingAccount() }
+                Button("Cancel") { viewModel.cancelAddingAccount() }
                 Spacer()
-                Button("Criar") { viewModel.confirmAddAccount() }
+                Button("Create") { viewModel.confirmAddAccount() }
                     .disabled(viewModel.newAccountName.trimmingCharacters(in: .whitespaces).isEmpty)
             }
         }
@@ -589,7 +589,7 @@ struct PanelView: View {
                     }
                 }
                 if let expiresAt = viewModel.accountStatuses[slug]?.refreshTokenExpiresAt {
-                    Text("Login expira \(expiresAt.formatted(.relative(presentation: .named)))")
+                    Text("Login expires \(expiresAt.formatted(.relative(presentation: .named)))")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
@@ -609,7 +609,7 @@ struct PanelView: View {
 
         if viewModel.needsLogin(slug: slug) {
             VStack(alignment: .leading, spacing: 6) {
-                Text("Essa conta ainda não fez login.")
+                Text("This account hasn't logged in yet.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Button {
@@ -618,7 +618,7 @@ struct PanelView: View {
                         loginSession.start(configDir: account.configDir)
                     }
                 } label: {
-                    Text("Fazer login")
+                    Text("Log In")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
@@ -627,26 +627,26 @@ struct PanelView: View {
         } else if state?.isLoading == true, state?.response == nil {
             ProgressView().controlSize(.small)
         } else if let response = state?.response {
-            // .id(slug) força o SwiftUI a recriar (não só atualizar) essas
-            // barras ao trocar de aba — reseta o @State de animação delas,
-            // então a barra sempre cresce do zero de novo. Entre polls da
-            // mesma conta, a identity é preservada e a transição anima
-            // suavemente do valor antigo pro novo, não do zero.
+            // .id(slug) forces SwiftUI to recreate (not just update) these
+            // bars when switching tabs — resets their animation @State,
+            // so the bar always grows from zero again. Between polls of the
+            // same account, identity is preserved and the transition animates
+            // smoothly from the old value to the new one, not from zero.
             Group {
-                usageBar(title: "Sessão (5h)", window: response.fiveHour, resetStyle: .relative)
-                usageBar(title: "Semana", window: response.sevenDay, resetStyle: .weekday)
+                usageBar(title: "Session (5h)", window: response.fiveHour, resetStyle: .relative)
+                usageBar(title: "Week", window: response.sevenDay, resetStyle: .weekday)
                 if let extra = response.extraUsage, extra.isEnabled {
                     extraUsageBar(extra)
                 }
             }
             .id(slug)
             if let error = state?.errorMessage {
-                Text("Não atualizado: \(error)")
+                Text("Not updated: \(error)")
                     .font(.caption2)
                     .foregroundStyle(.orange)
                     .fixedSize(horizontal: false, vertical: true)
             } else if let lastUpdated = state?.lastUpdated {
-                Text("atualizado \(lastUpdated.formatted(.relative(presentation: .named)))")
+                Text("updated \(lastUpdated.formatted(.relative(presentation: .named)))")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
@@ -656,7 +656,7 @@ struct PanelView: View {
                     .font(.caption)
                     .foregroundStyle(.red)
                     .fixedSize(horizontal: false, vertical: true)
-                Button("Tentar novamente") {
+                Button("Try Again") {
                     viewModel.loadUsage(slug: slug)
                 }
                 .font(.caption)
@@ -664,13 +664,13 @@ struct PanelView: View {
         }
     }
 
-    /// Mesmos 3 estágios, thresholds e cores do claude.ai (a extensão do VS
-    /// Code só tem 2 — site é mais granular, como o usuário notou).
-    /// Confirmado lendo o bundle JS do site (chunk shared-8, função `qF`):
-    /// `e>=90?"critical":e>=75?"warning":"normal"`, com as classes mapeadas
-    /// para `--cds-role-{accent,warning,danger}-*` → `--cds-{blue-450,
-    /// yellow-200,red-450}` no CSS resolvido. "normal" usa o azul do site
-    /// (não o accent do sistema) para bater com o print de referência.
+    /// Same 3 stages, thresholds, and colors as claude.ai (the VS
+    /// Code extension only has 2 — the site is more granular, as the user noticed).
+    /// Confirmed by reading the site's JS bundle (chunk shared-8, function `qF`):
+    /// `e>=90?"critical":e>=75?"warning":"normal"`, with the classes mapped
+    /// to `--cds-role-{accent,warning,danger}-*` → `--cds-{blue-450,
+    /// yellow-200,red-450}` in the resolved CSS. "normal" uses the site's blue
+    /// (not the system accent) to match the reference screenshot.
     private static let warningThreshold: Double = 75
     private static let criticalThreshold: Double = 90
     private static let normalColor = Color(red: 0x2a / 255, green: 0x78 / 255, blue: 0xd6 / 255)
@@ -684,9 +684,9 @@ struct PanelView: View {
     }
 
     private enum ResetStyle {
-        /// "reinicia em 3h 26min" — janelas curtas (sessão de 5h).
+        /// "resets in 3h 26min" — short windows (5h session).
         case relative
-        /// "reinicia seg., 06:00" — janelas longas (limite semanal).
+        /// "resets Mon, 06:00" — long windows (weekly limit).
         case weekday
     }
 
@@ -697,21 +697,18 @@ struct PanelView: View {
             let hours = Int(seconds) / 3600
             let minutes = (Int(seconds) % 3600) / 60
             if hours > 0 {
-                return "Reinicia em \(hours)h \(minutes)min"
+                return "Resets in \(hours)h \(minutes)min"
             }
-            return "Reinicia em \(minutes)min"
+            return "Resets in \(minutes)min"
         case .weekday:
             let formatter = DateFormatter()
-            formatter.locale = Locale(identifier: "pt_BR")
-            // "EEEE" em pt_BR dá "segunda-feira" — tira o "-feira" para bater
-            // com o formato pedido ("segunda", não "segunda-feira").
+            formatter.locale = Locale(identifier: "en_US")
             let weekday = formatter.weekdaySymbols[Calendar.current.component(.weekday, from: date) - 1]
-                .replacingOccurrences(of: "-feira", with: "")
             formatter.dateFormat = "d"
             let day = formatter.string(from: date)
             formatter.dateFormat = "HH:mm"
             let time = formatter.string(from: date)
-            return "Reinicia \(weekday) (\(day)) às \(time)"
+            return "Resets \(weekday) (\(day)) at \(time)"
         }
     }
 
@@ -746,7 +743,7 @@ struct PanelView: View {
             }
             UsageProgressBar(pct: pct, color: usageColor(for: pct))
             if let used = extra.usedCredits, let limit = extra.monthlyLimit {
-                Text("usado \(used, specifier: "%.2f") de \(limit, specifier: "%.2f")")
+                Text("used \(used, specifier: "%.2f") of \(limit, specifier: "%.2f")")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
@@ -763,7 +760,7 @@ struct PanelView: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
-            Menu("Trocar") {
+            Menu("Switch") {
                 ForEach(viewModel.accounts, id: \.slug) { account in
                     Button(account.name) {
                         viewModel.switchAccount(project: project, to: account)
@@ -787,7 +784,7 @@ struct PanelView: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
-            Menu("Trocar") {
+            Menu("Switch") {
                 ForEach(viewModel.accounts, id: \.slug) { account in
                     Button(account.name) {
                         viewModel.switchTerminalSessionAccount(session: session, to: account)

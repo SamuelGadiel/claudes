@@ -8,32 +8,32 @@ public enum ClaudeExtensionJSPatchError: Error, CustomStringConvertible {
     public var description: String {
         switch self {
         case .extensionNotFound:
-            return "extensão anthropic.claude-code não encontrada"
+            return "anthropic.claude-code extension not found"
         case .envPatchPointNotFound(let version):
-            return "não encontrei o ponto de patch esperado no extension.js da versão \(version) — " +
-                "a Anthropic pode ter mudado o formato minificado; precisa atualizar os regexes"
+            return "could not find the expected patch point in extension.js for version \(version) — " +
+                "Anthropic may have changed the minified format; the regexes need updating"
         case .writeFailed(let detail):
-            return "falha ao escrever extension.js patchado: \(detail)"
+            return "failed to write patched extension.js: \(detail)"
         }
     }
 }
 
 public struct ClaudeExtensionJSPatchStatus {
     public let extensionVersion: String
-    /// Vazio quando já estava tudo aplicado, ou quando pulamos por detectar
-    /// um update em andamento (ver `skippedReason`).
+    /// Empty when everything was already applied, or when we skipped because we detected
+    /// an update in progress (see `skippedReason`).
     public let changes: [String]
     public let skippedReason: String?
 }
 
-/// I/O em volta de `ClaudeExtensionJSPatcher` (a lógica pura de
-/// análise/transformação) — localizar o `extension.js` instalado, ler com
-/// retry/backoff (a extensão pode estar no meio de um update, arquivo
-/// momentaneamente vazio ou parcial), fazer backup, escrever com retry em
-/// caso de lock transiente. Mesmas proteções que
-/// `leog/claude-code-config-dir-patcher-vscode` usa (ver ATTRIBUTIONS.md),
-/// adaptadas de callbacks/setTimeout para Swift Concurrency — ver
-/// `TransientFileIO` (compartilhado com `VSCodeExtensionPatcher`).
+/// I/O around `ClaudeExtensionJSPatcher` (the pure analysis/transform
+/// logic) — locate the installed `extension.js`, read with
+/// retry/backoff (the extension may be in the middle of an update, file
+/// momentarily empty or partial), make a backup, write with retry in
+/// case of a transient lock. Same protections that
+/// `leog/claude-code-config-dir-patcher-vscode` uses (see ATTRIBUTIONS.md),
+/// adapted from callbacks/setTimeout to Swift Concurrency — see
+/// `TransientFileIO` (shared with `VSCodeExtensionPatcher`).
 public enum ClaudeExtensionJSPatchRunner {
     private static let backupSuffix = ".claude-switcher-js-patch.bak"
 
@@ -44,35 +44,35 @@ public enum ClaudeExtensionJSPatchRunner {
 
         guard FileManager.default.fileExists(atPath: jsPath) else {
             return ClaudeExtensionJSPatchStatus(
-                extensionVersion: version, changes: [], skippedReason: "extension.js não encontrado (update em andamento?)"
+                extensionVersion: version, changes: [], skippedReason: "extension.js not found (update in progress?)"
             )
         }
 
         var source = try await TransientFileIO.readWithRetry(path: jsPath)
         if source.isEmpty {
             return ClaudeExtensionJSPatchStatus(
-                extensionVersion: version, changes: [], skippedReason: "extension.js vazio (update em andamento)"
+                extensionVersion: version, changes: [], skippedReason: "extension.js empty (update in progress)"
             )
         }
 
         var status = ClaudeExtensionJSPatcher.analyze(source)
 
-        // Um arquivo não-vazio sem o ponto de patch pode ser um snapshot
-        // parcial capturado no meio de uma reescrita — observa a estabilidade
-        // antes de declarar um problema real.
+        // A non-empty file without the patch point might be a partial
+        // snapshot captured mid-rewrite — observe stability
+        // before declaring a real problem.
         if !status.envPatched, !status.envPatchable {
             let settled = try await TransientFileIO.readUntilStable(path: jsPath, initial: source)
             if settled.changed {
                 source = settled.source
                 if source.isEmpty {
                     return ClaudeExtensionJSPatchStatus(
-                        extensionVersion: version, changes: [], skippedReason: "extension.js vazio (update em andamento)"
+                        extensionVersion: version, changes: [], skippedReason: "extension.js empty (update in progress)"
                     )
                 }
                 status = ClaudeExtensionJSPatcher.analyze(source)
                 if !status.envPatched, !status.envPatchable {
                     return ClaudeExtensionJSPatchStatus(
-                        extensionVersion: version, changes: [], skippedReason: "arquivo ainda instável, tenta de novo depois"
+                        extensionVersion: version, changes: [], skippedReason: "file still unstable, try again later"
                     )
                 }
             }
@@ -107,7 +107,7 @@ public enum ClaudeExtensionJSPatchRunner {
     private static func extensionVersion(extensionDir: String) -> String {
         guard let data = FileManager.default.contents(atPath: extensionDir + "/package.json"),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-        else { return "desconhecida" }
-        return json["version"] as? String ?? "desconhecida"
+        else { return "unknown" }
+        return json["version"] as? String ?? "unknown"
     }
 }

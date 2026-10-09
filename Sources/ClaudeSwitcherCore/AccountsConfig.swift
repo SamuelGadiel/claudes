@@ -1,8 +1,8 @@
 import Foundation
 
-/// Formato legado (antes de existir `slug`/`defaultAccountSlug`): um array
-/// simples de contas, sem default. Usado só para migrar accounts.json
-/// existentes sem perder o que já estava registrado.
+/// Legacy format (before `slug`/`defaultAccountSlug` existed): a plain
+/// array of accounts, with no default. Used only to migrate existing
+/// accounts.json files without losing what was already registered.
 private struct LegacyAccount: Decodable {
     let name: String
     let configDir: String
@@ -13,46 +13,46 @@ public enum AccountsConfig {
         .expandingTildeInPath
     public static let configFilePath = configDirPath + "/accounts.json"
 
-    /// `messages` traz avisos informativos (config criada, arquivo migrado)
-    /// para quem chamou decidir como exibir — o Core nunca imprime direto,
-    /// porque é compartilhado entre o CLI `cs` e a futura GUI de status bar.
+    /// `messages` carries informational notices (config created, file migrated)
+    /// for the caller to decide how to display — Core never prints directly,
+    /// since it's shared between the `cs` CLI and the future status bar GUI.
     public static func load() -> (file: AccountsFile, messages: [String]) {
         let fm = FileManager.default
 
         guard fm.fileExists(atPath: configFilePath) else {
             let defaults = AccountsFile(
                 accounts: [
-                    RegisteredAccount(name: "Pessoal", slug: "pessoal", configDir: "~/.claude"),
-                    RegisteredAccount(name: "Trabalho", slug: "trabalho", configDir: "~/.claudew"),
+                    RegisteredAccount(name: "Personal", slug: "personal", configDir: "~/.claude"),
+                    RegisteredAccount(name: "Work", slug: "work", configDir: "~/.claudew"),
                 ],
-                defaultAccountSlug: "pessoal"
+                defaultAccountSlug: "personal"
             )
             save(defaults)
-            return (defaults, ["Config default criada em \(configFilePath) (use 'cs add'/'cs remove' para ajustar)"])
+            return (defaults, ["Default config created at \(configFilePath) (use 'cs add'/'cs remove' to adjust it)"])
         }
 
         guard let data = fm.contents(atPath: configFilePath) else {
-            return (AccountsFile(accounts: [], defaultAccountSlug: nil), ["Não consegui ler \(configFilePath)"])
+            return (AccountsFile(accounts: [], defaultAccountSlug: nil), ["Could not read \(configFilePath)"])
         }
 
         if let file = try? JSONDecoder().decode(AccountsFile.self, from: data) {
             return (file, [])
         }
 
-        // Formato legado: array simples sem slug/default. Migra preservando
-        // os dados e promovendo a primeira conta a default.
+        // Legacy format: plain array without slug/default. Migrates preserving
+        // the data and promoting the first account to default.
         if let legacy = try? JSONDecoder().decode([LegacyAccount].self, from: data) {
             let migrated = legacy.map {
                 RegisteredAccount(name: $0.name, slug: Slug.make(from: $0.name), configDir: $0.configDir)
             }
             let file = AccountsFile(accounts: migrated, defaultAccountSlug: migrated.first?.slug)
             save(file)
-            return (file, ["accounts.json migrado para o novo formato (com slug + conta default)."])
+            return (file, ["accounts.json migrated to the new format (with slug + default account)."])
         }
 
         return (
             AccountsFile(accounts: [], defaultAccountSlug: nil),
-            ["Não consegui parsear \(configFilePath) — formato desconhecido."]
+            ["Could not parse \(configFilePath) — unknown format."]
         )
     }
 
@@ -65,8 +65,8 @@ public enum AccountsConfig {
         try? data.write(to: URL(fileURLWithPath: configFilePath))
     }
 
-    /// Aceita slug ou nome (case-insensitive) — comandos novos usam slug,
-    /// mas isso evita quebrar quem ainda digita o nome amigável.
+    /// Accepts slug or name (case-insensitive) — newer commands use slug,
+    /// but this avoids breaking anyone who still types the friendly name.
     public static func find(identifier: String, in file: AccountsFile) -> RegisteredAccount? {
         file.accounts.first {
             $0.slug.caseInsensitiveCompare(identifier) == .orderedSame

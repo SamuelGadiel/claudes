@@ -7,16 +7,16 @@ public struct VSCodeSettingsResult {
     public let warnings: [String]
 }
 
-/// Escreve/atualiza CLAUDE_CONFIG_DIR em .vscode/settings.json fazendo merge
-/// seguro: nunca sobrescreve o arquivo inteiro, só a entrada
-/// claudeCode.environmentVariables com name == "CLAUDE_CONFIG_DIR".
-/// Ver plans/specs/02-integracao-vscode-sem-profiles.
+/// Writes/updates CLAUDE_CONFIG_DIR in .vscode/settings.json doing a safe
+/// merge: never overwrites the whole file, only the
+/// claudeCode.environmentVariables entry with name == "CLAUDE_CONFIG_DIR".
+/// See plans/specs/02-integracao-vscode-sem-profiles.
 public enum VSCodeSettings {
     public static func setConfigDir(projectPath: String, configDir: String) throws -> VSCodeSettingsResult {
         let expandedProject = (projectPath as NSString).expandingTildeInPath
-        // CLAUDE_CONFIG_DIR vai pro ambiente de um processo, que não expande
-        // "~" sozinho (isso é feito pelo shell, não por quem lê a env var) —
-        // sempre gravar o path absoluto.
+        // CLAUDE_CONFIG_DIR goes into a process's environment, which doesn't
+        // expand "~" on its own (that's done by the shell, not by whoever reads
+        // the env var) — always write the absolute path.
         let expandedConfigDir = (configDir as NSString).expandingTildeInPath
         let vscodeDir = expandedProject + "/.vscode"
         let settingsFile = vscodeDir + "/settings.json"

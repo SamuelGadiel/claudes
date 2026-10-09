@@ -3,23 +3,23 @@ import Foundation
 public struct RunningClaudeSession: Sendable {
     public let pid: Int32
     public let cwd: String?
-    /// nil quando CLAUDE_CONFIG_DIR não está no ambiente do processo — nesse
-    /// caso ele está usando o default do sistema (~/.claude).
+    /// nil when CLAUDE_CONFIG_DIR is not in the process's environment — in that
+    /// case it's using the system default (~/.claude).
     public let configDirFromEnv: String?
-    /// true quando o processo tem os flags que só a extensão oficial do VS
-    /// Code (ou outro editor integrado) passa — usado para não duplicar com
-    /// a lista de OpenedWindowsReader.
+    /// true when the process has the flags that only the official VS
+    /// Code extension (or another integrated editor) passes — used to avoid duplicating
+    /// with OpenedWindowsReader's list.
     public let isManagedByEditor: Bool
 }
 
-/// Detecta processos `claude` em execução (dentro ou fora de um editor) e lê
-/// o CLAUDE_CONFIG_DIR real do ambiente deles — não uma inferência. Validado
-/// nesta máquina sem nenhuma permissão especial (sysctl/proc_pidinfo são
-/// APIs padrão para processos do mesmo usuário). Ver plans/specs/06.
+/// Detects running `claude` processes (inside or outside an editor) and reads
+/// their real CLAUDE_CONFIG_DIR from the environment — not an inference. Validated
+/// on this machine without any special permission (sysctl/proc_pidinfo are
+/// standard APIs for processes owned by the same user). See plans/specs/06.
 public enum RunningClaudeSessions {
-    /// Flags que só aparecem em processos lançados por um editor integrado
-    /// (hoje, a extensão oficial do VS Code) — nunca num `claude` digitado
-    /// manualmente no terminal.
+    /// Flags that only appear in processes launched by an integrated editor
+    /// (today, the official VS Code extension) — never in a `claude` typed
+    /// manually in the terminal.
     private static let editorManagedMarkers = ["--output-format", "--input-format"]
 
     public static func list() -> [RunningClaudeSession] {
@@ -34,7 +34,7 @@ public enum RunningClaudeSessions {
         }
     }
 
-    // MARK: - Enumerar PIDs por nome (sysctl KERN_PROC_ALL)
+    // MARK: - Enumerate PIDs by name (sysctl KERN_PROC_ALL)
 
     private static func pidsNamed(_ name: String) -> [Int32] {
         var mib: [Int32] = [CTL_KERN, KERN_PROC, KERN_PROC_ALL, 0]

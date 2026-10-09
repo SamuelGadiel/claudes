@@ -1,9 +1,9 @@
 import Foundation
 
-/// Único ponto do Core que lê o accessToken de verdade do Keychain — toda
-/// outra leitura de credencial (AccountDiscovery) deliberadamente o ignora.
-/// Usado apenas para autenticar a chamada a /api/oauth/usage (specs/06);
-/// quem chama deve usar o valor imediatamente e nunca persisti-lo.
+/// The only point in Core that reads the real accessToken from the Keychain —
+/// every other credential read (AccountDiscovery) deliberately ignores it.
+/// Used only to authenticate the call to /api/oauth/usage (specs/06);
+/// callers must use the value immediately and never persist it.
 private struct AccessTokenPayload: Decodable {
     let claudeAiOauth: OAuth?
     struct OAuth: Decodable {
@@ -17,8 +17,8 @@ public enum AccessTokenError: Error, CustomStringConvertible {
 
     public var description: String {
         switch self {
-        case .notFound: return "nenhuma credencial encontrada no Keychain para essa conta"
-        case .missingInPayload: return "credencial encontrada, mas sem accessToken"
+        case .notFound: return "no credential found in Keychain for this account"
+        case .missingInPayload: return "credential found, but missing accessToken"
         }
     }
 }

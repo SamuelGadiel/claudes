@@ -1,8 +1,8 @@
 import SwiftUI
 
-/// UI do fluxo de login embutido — nunca implementa autenticação, só
-/// reflete o estado real de `claude auth login` rodando por trás e repassa
-/// o código que o usuário cola de volta para esse processo.
+/// UI for the embedded login flow — never implements authentication, only
+/// reflects the real state of `claude auth login` running behind it and passes
+/// the code the user pastes back to that process.
 struct LoginSessionView: View {
     @ObservedObject var session: LoginSessionController
     let onDismiss: () -> Void
@@ -16,24 +16,24 @@ struct LoginSessionView: View {
             case .starting:
                 HStack {
                     ProgressView().controlSize(.small)
-                    Text("Iniciando login…")
+                    Text("Starting login…")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
 
             case .waitingForCode:
-                Text("Faça login no navegador que abriu")
+                Text("Log in in the browser that opened")
                     .font(.headline)
-                Text("Depois, cole aqui o código que a página mostrou:")
+                Text("Then, paste the code the page showed here:")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                TextField("Código", text: $session.codeInput)
+                TextField("Code", text: $session.codeInput)
                     .textFieldStyle(.roundedBorder)
                     .onSubmit { session.submitCode() }
                 HStack {
-                    Button("Cancelar") { onDismiss() }
+                    Button("Cancel") { onDismiss() }
                     Spacer()
-                    Button("Confirmar") { session.submitCode() }
+                    Button("Confirm") { session.submitCode() }
                         .buttonStyle(.borderedProminent)
                         .disabled(session.codeInput.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
@@ -41,24 +41,24 @@ struct LoginSessionView: View {
             case .submitting:
                 HStack {
                     ProgressView().controlSize(.small)
-                    Text("Verificando código…")
+                    Text("Verifying code…")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
 
             case .success:
-                // Fechamento é imediato (ver onChange em PanelView) — nunca
-                // fica visível por tempo perceptível, não precisa de conteúdo.
+                // Dismissal is immediate (see onChange in PanelView) — it never
+                // stays visible long enough to notice, no content needed.
                 EmptyView()
 
             case .failure(let message):
-                Text("Não deu certo")
+                Text("That didn't work")
                     .font(.headline)
                 Text(message)
                     .font(.caption)
                     .foregroundStyle(.red)
                     .fixedSize(horizontal: false, vertical: true)
-                Button("Fechar") { onDismiss() }
+                Button("Close") { onDismiss() }
             }
         }
     }

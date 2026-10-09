@@ -13,17 +13,17 @@ public enum ClaudeAuthStatusError: Error, CustomStringConvertible {
 
     public var description: String {
         switch self {
-        case .processLaunchFailed(let detail): return "falha ao executar claude auth status: \(detail)"
-        case .decoding(let detail): return "erro ao decodificar resposta de claude auth status: \(detail)"
+        case .processLaunchFailed(let detail): return "failed to execute claude auth status: \(detail)"
+        case .decoding(let detail): return "error decoding claude auth status response: \(detail)"
         }
     }
 }
 
-/// Lê e-mail, organização e tipo de assinatura (Pro/Team/etc) da conta —
-/// `claude auth status` já devolve isso em JSON, rápido (processo curto,
-/// sem o protocolo de controle usado por UsageControlClient, que não expõe
-/// e-mail). O comando retorna JSON válido tanto logado quanto deslogado
-/// (sem travar esperando login interativo).
+/// Reads the account's email, organization, and subscription type (Pro/Team/etc) —
+/// `claude auth status` already returns this as JSON, fast (short-lived process,
+/// without the control protocol used by UsageControlClient, which doesn't expose
+/// email). The command returns valid JSON both logged in and logged out
+/// (without blocking waiting for interactive login).
 public enum ClaudeAuthStatusClient {
     public static func fetch(configDir: String, timeout: TimeInterval = 10) throws -> ClaudeAuthStatus {
         let process = Process()

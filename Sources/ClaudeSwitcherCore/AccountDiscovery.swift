@@ -4,9 +4,9 @@ import Foundation
 public enum AccountDiscovery {
     private static let defaultConfigDir = ("~/.claude" as NSString).expandingTildeInPath
 
-    /// service == "Claude Code-credentials" para o CLAUDE_CONFIG_DIR default,
-    /// ou "Claude Code-credentials-<sha256(path)[:8]>" para qualquer outro.
-    /// Confirmado empiricamente nesta máquina (ver plans/specs/01-...).
+    /// service == "Claude Code-credentials" for the default CLAUDE_CONFIG_DIR,
+    /// or "Claude Code-credentials-<sha256(path)[:8]>" for any other.
+    /// Confirmed empirically on this machine (see plans/specs/01-...).
     public static func keychainService(forConfigDir path: String) -> String {
         let expanded = (path as NSString).expandingTildeInPath
         guard expanded != defaultConfigDir else {
@@ -17,14 +17,14 @@ public enum AccountDiscovery {
         return "Claude Code-credentials-\(hex.prefix(8))"
     }
 
-    /// Status de uma conta que acabou de ser criada — sabemos de antemão
-    /// que não há credencial ainda, então não vale consultar o Keychain.
+    /// Status of an account that was just created — we know in advance
+    /// there's no credential yet, so it's not worth querying the Keychain.
     public static func notLoggedInStatus(for account: RegisteredAccount) -> AccountStatus {
         AccountStatus(
             name: account.name, configDir: account.configDir,
             keychainService: keychainService(forConfigDir: account.configDir),
             expiresAt: nil, refreshTokenExpiresAt: nil, subscriptionType: nil, rateLimitTier: nil,
-            error: "conta recém-criada, ainda sem login"
+            error: "newly created account, not yet logged in"
         )
     }
 
@@ -39,7 +39,7 @@ public enum AccountDiscovery {
                 return AccountStatus(
                     name: account.name, configDir: account.configDir, keychainService: service,
                     expiresAt: nil, refreshTokenExpiresAt: nil, subscriptionType: nil, rateLimitTier: nil,
-                    error: "credencial encontrada, mas sem o campo claudeAiOauth"
+                    error: "credential found, but missing the claudeAiOauth field"
                 )
             }
 

@@ -3,20 +3,20 @@ import Foundation
 
 func printUsage() {
     print("""
-    Uso:
-      cs                                     roda claude com a conta do projeto atual (ou a default)
-      cs <slug> [args...]                    roda claude com essa conta, repassando args (ex: cs trabalho auth login)
-      cs list                                lista contas registradas e status de expiração
-      cs add --name <nome> [--dir <path>] [--slug <slug>] [--default]
-      cs remove <slug>                       remove do registro (não apaga a pasta)
-      cs set <slug>                          define a conta deste projeto (.clauderc + .vscode/settings.json)
-      cs default <slug>                      define a conta usada quando o projeto não tem .clauderc
-      cs install-cli                         instala/atualiza o link 'cs' num diretório do PATH
-      cs status                              lista projetos VS Code abertos e sessões de terminal rodando, com a conta de cada um
+    Usage:
+      cs                                     runs claude with the current project's account (or the default one)
+      cs <slug> [args...]                    runs claude with that account, passing along args (e.g.: cs work auth login)
+      cs list                                lists registered accounts and expiration status
+      cs add --name <name> [--dir <path>] [--slug <slug>] [--default]
+      cs remove <slug>                       removes from the registry (doesn't delete the folder)
+      cs set <slug>                          sets this project's account (.clauderc + .vscode/settings.json)
+      cs default <slug>                      sets the account used when the project has no .clauderc
+      cs install-cli                         installs/updates the 'cs' link in a PATH directory
+      cs status                              lists open VS Code projects and running terminal sessions, with each one's account
 
-    Legado (specs 02/04, ainda funcionam):
-      cs set-account <projeto> <conta>
-      cs sync-sessions <projeto> <origem> <destino>
+    Legacy (specs 02/04, still work):
+      cs set-account <project> <account>
+      cs sync-sessions <project> <source> <destination>
     """)
 }
 
@@ -27,8 +27,8 @@ let dateFormatter: DateFormatter = {
     return f
 }()
 
-/// Carrega accounts.json e imprime as mensagens informativas do Core
-/// (config criada, migração) — o Core só retorna dados, quem imprime é o CLI.
+/// Loads accounts.json and prints Core's informational messages
+/// (config created, migration) — Core only returns data, the CLI does the printing.
 func loadAccountsPrintingMessages() -> AccountsFile {
     let (file, messages) = AccountsConfig.load()
     for message in messages { print(message) }
@@ -39,7 +39,7 @@ func loadAccountsPrintingMessages() -> AccountsFile {
 func runList() {
     let file = loadAccountsPrintingMessages()
     if file.accounts.isEmpty {
-        print("Nenhuma conta registrada ainda. Use 'cs add --name <nome>'.")
+        print("No accounts registered yet. Use 'cs add --name <name>'.")
         return
     }
 
@@ -53,15 +53,15 @@ func runList() {
             print("   status: \(error)")
         } else {
             if let expiresAt = status.expiresAt {
-                print("   access token expira em: \(dateFormatter.string(from: expiresAt)) (renova sozinho, ok)")
+                print("   access token expires on: \(dateFormatter.string(from: expiresAt)) (renews itself, ok)")
             }
             if let refreshExpiresAt = status.refreshTokenExpiresAt {
                 let expired = refreshExpiresAt < Date()
-                let marker = expired ? " [PRECISA LOGIN DE NOVO]" : ""
-                print("   refresh token expira em: \(dateFormatter.string(from: refreshExpiresAt))\(marker)")
+                let marker = expired ? " [NEEDS LOGIN AGAIN]" : ""
+                print("   refresh token expires on: \(dateFormatter.string(from: refreshExpiresAt))\(marker)")
             }
             if let subscriptionType = status.subscriptionType {
-                print("   plano: \(subscriptionType)")
+                print("   plan: \(subscriptionType)")
             }
             if let rateLimitTier = status.rateLimitTier {
                 print("   rate limit tier: \(rateLimitTier)")
@@ -82,27 +82,27 @@ func runAdd(args: [String]) {
         switch args[i] {
         case "--name":
             i += 1
-            guard i < args.count else { print("faltou valor para --name"); exit(1) }
+            guard i < args.count else { print("missing value for --name"); exit(1) }
             name = args[i]
         case "--dir":
             i += 1
-            guard i < args.count else { print("faltou valor para --dir"); exit(1) }
+            guard i < args.count else { print("missing value for --dir"); exit(1) }
             dir = args[i]
         case "--slug":
             i += 1
-            guard i < args.count else { print("faltou valor para --slug"); exit(1) }
+            guard i < args.count else { print("missing value for --slug"); exit(1) }
             slugOverride = args[i]
         case "--default":
             markDefault = true
         default:
-            print("Argumento desconhecido: \(args[i])")
+            print("Unknown argument: \(args[i])")
             exit(1)
         }
         i += 1
     }
 
     guard let name, !name.isEmpty else {
-        print("Uso: cs add --name <nome> [--dir <path>] [--slug <slug>] [--default]")
+        print("Usage: cs add --name <name> [--dir <path>] [--slug <slug>] [--default]")
         exit(1)
     }
 
@@ -112,47 +112,47 @@ func runAdd(args: [String]) {
             name: name, dir: dir, slugOverride: slugOverride, markDefault: markDefault
         )
     } catch {
-        print("Erro: \(error)")
+        print("Error: \(error)")
         exit(1)
     }
 
     let (file, _) = AccountsConfig.load()
-    print("Conta '\(account.name)' registrada (slug: \(account.slug), dir: \(account.configDir)).")
+    print("Account '\(account.name)' registered (slug: \(account.slug), dir: \(account.configDir)).")
     if file.defaultAccountSlug == account.slug {
-        print("Definida como conta default.")
+        print("Set as the default account.")
     }
 
-    print("\nFazer login nessa conta agora? [s/N] ", terminator: "")
+    print("\nLog in to this account now? [y/N] ", terminator: "")
     let answer = readLine()?.lowercased() ?? ""
-    if answer == "s" || answer == "sim" || answer == "y" || answer == "yes" {
+    if answer == "y" || answer == "yes" {
         let status = ClaudeGateway.execute(configDir: account.configDir, arguments: ["auth", "login"])
         if status != 0 {
-            print("\n'claude auth login' terminou com código \(status).")
+            print("\n'claude auth login' exited with code \(status).")
         }
     } else {
-        print("Ok. Quando quiser logar: cs \(account.slug) auth login")
+        print("Ok. When you want to log in: cs \(account.slug) auth login")
     }
 }
 
 func runRemove(args: [String]) {
     guard let identifier = args.first else {
-        print("Uso: cs remove <slug>")
+        print("Usage: cs remove <slug>")
         exit(1)
     }
 
     let file = loadAccountsPrintingMessages()
     guard let target = AccountsConfig.find(identifier: identifier, in: file) else {
-        print("Conta '\(identifier)' não encontrada.")
+        print("Account '\(identifier)' not found.")
         exit(1)
     }
 
     print(
-        "Isso apaga o diretório \(target.configDir) e a credencial no Keychain — não dá pra desfazer. "
-            + "Remover '\(target.name)'? [s/N] ", terminator: ""
+        "This deletes the \(target.configDir) directory and the credential in the Keychain — it cannot be undone. "
+            + "Remove '\(target.name)'? [y/N] ", terminator: ""
     )
     let answer = readLine()?.lowercased() ?? ""
-    guard answer == "s" || answer == "sim" || answer == "y" || answer == "yes" else {
-        print("Cancelado.")
+    guard answer == "y" || answer == "yes" else {
+        print("Cancelled.")
         return
     }
 
@@ -162,30 +162,30 @@ func runRemove(args: [String]) {
     do {
         account = try AccountsConfig.removeAccount(slug: identifier)
     } catch {
-        print("Erro: \(error)")
+        print("Error: \(error)")
         exit(1)
     }
 
     let (after, _) = AccountsConfig.load()
     if wasDefault == account.slug, let newDefault = after.defaultAccountSlug {
-        print("'\(account.name)' era a conta default — promovendo '\(newDefault)' no lugar.")
+        print("'\(account.name)' was the default account — promoting '\(newDefault)' in its place.")
     }
 
     print(
-        "Conta '\(account.name)' removida — diretório \(account.configDir) e credencial do "
-            + "Keychain apagados."
+        "Account '\(account.name)' removed — directory \(account.configDir) and the "
+            + "Keychain credential deleted."
     )
 }
 
 func runSet(args: [String]) {
     guard let identifier = args.first else {
-        print("Uso: cs set <slug>")
+        print("Usage: cs set <slug>")
         exit(1)
     }
 
     let file = loadAccountsPrintingMessages()
     guard let account = AccountsConfig.find(identifier: identifier, in: file) else {
-        print("Conta '\(identifier)' não encontrada.")
+        print("Account '\(identifier)' not found.")
         exit(1)
     }
 
@@ -193,9 +193,9 @@ func runSet(args: [String]) {
 
     do {
         try ClauderFile.write(accountSlug: account.slug, inDir: cwd)
-        print("OK: \(cwd)/.clauderc agora usa a conta '\(account.name)' (\(account.slug)).")
+        print("OK: \(cwd)/.clauderc now uses account '\(account.name)' (\(account.slug)).")
     } catch {
-        print("Erro ao escrever .clauderc: \(error)")
+        print("Error writing .clauderc: \(error)")
         exit(1)
     }
 
@@ -205,25 +205,25 @@ func runSet(args: [String]) {
             print("\n\(warning)")
         }
     } catch {
-        print("\nAviso: não consegui atualizar .vscode/settings.json: \(error)")
+        print("\nWarning: could not update .vscode/settings.json: \(error)")
     }
 }
 
 func runDefault(args: [String]) {
     guard let identifier = args.first else {
-        print("Uso: cs default <slug>")
+        print("Usage: cs default <slug>")
         exit(1)
     }
 
     var file = loadAccountsPrintingMessages()
     guard let account = AccountsConfig.find(identifier: identifier, in: file) else {
-        print("Conta '\(identifier)' não encontrada.")
+        print("Account '\(identifier)' not found.")
         exit(1)
     }
 
     file.defaultAccountSlug = account.slug
     AccountsConfig.save(file)
-    print("'\(account.name)' (\(account.slug)) agora é a conta default.")
+    print("'\(account.name)' (\(account.slug)) is now the default account.")
 }
 
 func runStatus() {
@@ -236,29 +236,29 @@ func runStatus() {
         }) {
             return "\(account.name) (\(account.slug))"
         }
-        return "conta não registrada (\(target))"
+        return "unregistered account (\(target))"
     }
 
     let openedWindows = OpenedWindowsReader.read()
-    print("Projetos abertos no VS Code:")
+    print("Projects open in VS Code:")
     if openedWindows.isEmpty {
-        print("   (nenhum)")
+        print("   (none)")
     } else {
         for window in openedWindows {
             let slug = ClauderFile.find(startingAt: window.path)?.account
             let label = slug.flatMap { AccountsConfig.find(identifier: $0, in: file) }
-                .map { "\($0.name) (\($0.slug))" } ?? "sem conta definida"
+                .map { "\($0.name) (\($0.slug))" } ?? "no account set"
             print("   \(window.name) — \(label) — \(window.path)")
         }
     }
 
-    print("\nSessões de terminal (fora de editores):")
+    print("\nTerminal sessions (outside editors):")
     let sessions = RunningClaudeSessions.list().filter { !$0.isManagedByEditor }
     if sessions.isEmpty {
-        print("   (nenhuma)")
+        print("   (none)")
     } else {
         for session in sessions {
-            let cwd = session.cwd ?? "(cwd desconhecido)"
+            let cwd = session.cwd ?? "(unknown cwd)"
             print("   pid \(session.pid) — \(accountLabel(forConfigDir: session.configDirFromEnv)) — \(cwd)")
         }
     }
@@ -266,13 +266,13 @@ func runStatus() {
 
 func runUsage(args: [String]) {
     guard let identifier = args.first else {
-        print("Uso: cs usage <slug>")
+        print("Usage: cs usage <slug>")
         exit(1)
     }
 
     let file = loadAccountsPrintingMessages()
     guard let account = AccountsConfig.find(identifier: identifier, in: file) else {
-        print("Conta '\(identifier)' não encontrada.")
+        print("Account '\(identifier)' not found.")
         exit(1)
     }
 
@@ -280,20 +280,20 @@ func runUsage(args: [String]) {
         guard let window else { return }
         let pct = window.utilization.map { "\(Int($0))%" } ?? "?"
         let resets = window.resetsAt.map { dateFormatter.string(from: $0) } ?? "?"
-        print("  \(label): \(pct) (reseta \(resets))")
+        print("  \(label): \(pct) (resets \(resets))")
     }
 
     do {
         let response = try UsageControlClient.fetch(configDir: account.configDir)
         formatWindow("5h", response.fiveHour)
-        formatWindow("Semana", response.sevenDay)
-        formatWindow("Semana (Opus)", response.sevenDayOpus)
+        formatWindow("Week", response.sevenDay)
+        formatWindow("Week (Opus)", response.sevenDayOpus)
         if let extra = response.extraUsage, extra.isEnabled {
             let pct = extra.utilization.map { "\(Int($0))%" } ?? "?"
-            print("  Extra: \(pct) (usado \(extra.usedCredits ?? 0) de \(extra.monthlyLimit ?? 0))")
+            print("  Extra: \(pct) (used \(extra.usedCredits ?? 0) of \(extra.monthlyLimit ?? 0))")
         }
     } catch {
-        print("Erro: \(error)")
+        print("Error: \(error)")
     }
 }
 
@@ -302,16 +302,16 @@ func runInstallCli() {
         let result = try ShellInstall.install()
         print("OK: \(result.linkPath) -> \(result.targetPath)")
         if result.linkDirInPath {
-            print("Pronto — abra um novo terminal (ou rode 'exec $SHELL') e 'cs' já funciona.")
+            print("Done — open a new terminal (or run 'exec $SHELL') and 'cs' will work.")
         } else {
             let dir = (result.linkPath as NSString).deletingLastPathComponent
             print(
-                "\nAviso: \(dir) não está no seu PATH ainda. Adicione ao seu shell profile "
-                    + "(~/.zshrc, por exemplo):\n  export PATH=\"\(dir):$PATH\""
+                "\nWarning: \(dir) is not in your PATH yet. Add it to your shell profile "
+                    + "(~/.zshrc, for example):\n  export PATH=\"\(dir):$PATH\""
             )
         }
     } catch {
-        print("Erro: \(error)")
+        print("Error: \(error)")
         exit(1)
     }
 }
@@ -319,18 +319,18 @@ func runInstallCli() {
 func runSetAccount(projectPath: String, accountName: String) {
     let file = loadAccountsPrintingMessages()
     guard let account = AccountsConfig.find(identifier: accountName, in: file) else {
-        print("Conta '\(accountName)' não encontrada. Contas registradas: \(file.accounts.map(\.name).joined(separator: ", "))")
+        print("Account '\(accountName)' not found. Registered accounts: \(file.accounts.map(\.name).joined(separator: ", "))")
         exit(1)
     }
 
     do {
         let result = try VSCodeSettings.setConfigDir(projectPath: projectPath, configDir: account.configDir)
-        print("OK: \(result.settingsPath) agora usa a conta '\(account.name)' (\(account.configDir)).")
+        print("OK: \(result.settingsPath) now uses account '\(account.name)' (\(account.configDir)).")
         for warning in result.warnings {
             print("\n\(warning)")
         }
     } catch {
-        print("Erro ao atualizar settings.json: \(error)")
+        print("Error updating settings.json: \(error)")
         exit(1)
     }
 }
@@ -338,11 +338,11 @@ func runSetAccount(projectPath: String, accountName: String) {
 func runSyncSessions(projectPath: String, fromName: String, toName: String) {
     let file = loadAccountsPrintingMessages()
     guard let fromAccount = AccountsConfig.find(identifier: fromName, in: file) else {
-        print("Conta '\(fromName)' não encontrada. Contas registradas: \(file.accounts.map(\.name).joined(separator: ", "))")
+        print("Account '\(fromName)' not found. Registered accounts: \(file.accounts.map(\.name).joined(separator: ", "))")
         exit(1)
     }
     guard let toAccount = AccountsConfig.find(identifier: toName, in: file) else {
-        print("Conta '\(toName)' não encontrada. Contas registradas: \(file.accounts.map(\.name).joined(separator: ", "))")
+        print("Account '\(toName)' not found. Registered accounts: \(file.accounts.map(\.name).joined(separator: ", "))")
         exit(1)
     }
 
@@ -350,18 +350,18 @@ func runSyncSessions(projectPath: String, fromName: String, toName: String) {
         let result = try SessionSync.sync(projectPath: projectPath, from: fromAccount, to: toAccount)
 
         if result.copied.isEmpty {
-            print("Nada para sincronizar — nenhuma sessão nova em '\(fromAccount.name)' (\(result.sourceDir)).")
+            print("Nothing to sync — no new session in '\(fromAccount.name)' (\(result.sourceDir)).")
         } else {
-            print("Copiadas \(result.copied.count) sessão(ões) de '\(fromAccount.name)' para '\(toAccount.name)':")
+            print("Copied \(result.copied.count) session(s) from '\(fromAccount.name)' to '\(toAccount.name)':")
             for file in result.copied { print("  - \(file)") }
         }
 
         if !result.skippedExisting.isEmpty {
-            print("\nJá existiam em '\(toAccount.name)' e NÃO foram sobrescritas:")
+            print("\nAlready existed in '\(toAccount.name)' and were NOT overwritten:")
             for file in result.skippedExisting { print("  - \(file)") }
         }
     } catch {
-        print("Erro: \(error)")
+        print("Error: \(error)")
         exit(1)
     }
 }
@@ -371,7 +371,7 @@ func runSyncSessions(projectPath: String, fromName: String, toName: String) {
 let allArgs = Array(CommandLine.arguments.dropFirst())
 
 guard let first = allArgs.first else {
-    // `cs` sozinho: resolve a conta do projeto atual e abre o claude interativo.
+    // `cs` alone: resolves the current project's account and opens interactive claude.
     let file = loadAccountsPrintingMessages()
     let cwd = FileManager.default.currentDirectoryPath
     let account = AccountResolver.resolve(forCwd: cwd, in: file)
@@ -408,11 +408,11 @@ case "help", "-h", "--help":
 case "-v", "--version":
     print("cs (claude-switcher) dev")
 default:
-    // Gateway: trata o primeiro argumento como slug de conta e repassa o
-    // resto para o claude real (ex: "cs trabalho auth login").
+    // Gateway: treats the first argument as an account slug and passes the
+    // rest to the real claude (e.g.: "cs work auth login").
     let file = loadAccountsPrintingMessages()
     guard let account = AccountsConfig.find(identifier: first, in: file) else {
-        print("'\(first)' não é um comando nem uma conta registrada. Rode 'cs list' ou 'cs help'.")
+        print("'\(first)' is neither a command nor a registered account. Run 'cs list' or 'cs help'.")
         exit(1)
     }
     ClaudeGateway.run(configDir: account.configDir, arguments: rest)

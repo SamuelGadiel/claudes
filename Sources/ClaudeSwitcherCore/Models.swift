@@ -1,9 +1,9 @@
 import Foundation
 
-/// Só declara os campos que nos interessam. O JSONDecoder ignora qualquer
-/// chave não declarada aqui — isso inclui accessToken/refreshToken e os
-/// blocos de mcpOAuth de outros plugins. Eles nunca chegam a existir como
-/// propriedade Swift nesta struct.
+/// Only declares the fields we care about. JSONDecoder ignores any key not
+/// declared here — that includes accessToken/refreshToken and the
+/// mcpOAuth blocks of other plugins. They never end up existing as a Swift
+/// property in this struct.
 struct ClaudeAiOAuth: Decodable {
     let expiresAt: Int64
     let refreshTokenExpiresAt: Int64?
@@ -17,8 +17,8 @@ struct CredentialPayload: Decodable {
 
 public struct RegisteredAccount: Codable {
     public let name: String
-    /// Identificador técnico usado em `cs <slug>`, `cs set <slug>` etc.
-    /// Estável (sem espaço/acento/caixa), diferente do `name` que é só exibição.
+    /// Technical identifier used in `cs <slug>`, `cs set <slug>`, etc.
+    /// Stable (no spaces/accents/case changes), unlike `name` which is display-only.
     public let slug: String
     public let configDir: String
 
@@ -32,8 +32,8 @@ public struct RegisteredAccount: Codable {
 /// ~/Library/Application Support/ClaudeSwitcher/accounts.json
 public struct AccountsFile: Codable {
     public var accounts: [RegisteredAccount]
-    /// slug da conta usada quando o projeto não define nenhuma (via .clauderc).
-    /// Sempre não-nil a partir da primeira conta criada (ver AccountsConfig).
+    /// Slug of the account used when the project doesn't define one (via .clauderc).
+    /// Always non-nil from the first created account onward (see AccountsConfig).
     public var defaultAccountSlug: String?
 
     public init(accounts: [RegisteredAccount], defaultAccountSlug: String?) {

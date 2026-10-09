@@ -1,13 +1,13 @@
 import Foundation
 
-/// Raiz de instalação de extensões de um editor compatível com o formato do
-/// VS Code (`<raiz>/extensions/anthropic.claude-code-<versão>-<plataforma>`).
-/// Hoje só VS Code estável e Insiders — a mesma extensão oficial roda nos
-/// dois, cada um com sua própria cópia instalada, então os dois precisam
-/// ser patchados independentemente se ambos estiverem presentes. Forks como
-/// Cursor/Windsurf usam esse mesmo formato de pasta e poderiam ser
-/// adicionados aqui no futuro, mas não foram validados — fora de escopo
-/// por ora.
+/// Extension installation root of an editor compatible with the VS Code
+/// format (`<root>/extensions/anthropic.claude-code-<version>-<platform>`).
+/// Today only VS Code stable and Insiders — the same official extension runs on
+/// both, each with its own installed copy, so both need to
+/// be patched independently if both are present. Forks like
+/// Cursor/Windsurf use this same folder format and could be
+/// added here in the future, but haven't been validated — out of scope
+/// for now.
 public enum VSCodeEditorRoot: String, CaseIterable, CustomStringConvertible {
     case stable = "~/.vscode"
     case insiders = "~/.vscode-insiders"
@@ -34,17 +34,17 @@ public enum VSCodeExtensionPatchError: Error, CustomStringConvertible {
     public var description: String {
         switch self {
         case .extensionNotFound:
-            return "extensão anthropic.claude-code não encontrada"
+            return "anthropic.claude-code extension not found"
         case .packageJSONUnreadable(let detail):
-            return "não consegui ler/decodificar o package.json da extensão mesmo após esperar " +
-                "estabilizar (não é timing de update) — \(detail)"
+            return "could not read/decode the extension's package.json even after waiting " +
+                "for it to stabilize (not an update-timing issue) — \(detail)"
         case .settingNotFound:
-            return "o setting claudeCode.environmentVariables não existe mais no package.json — a extensão pode ter mudado de formato"
+            return "the claudeCode.environmentVariables setting no longer exists in package.json — the extension may have changed format"
         case .unrecognizedScope(let scope):
-            return "scope atual ('\(scope)') não é nem 'machine' (original) nem 'window' (patchado) — " +
-                "a extensão pode ter mudado; não tentei mexer para não quebrar algo desconhecido"
+            return "current scope ('\(scope)') is neither 'machine' (original) nor 'window' (patched) — " +
+                "the extension may have changed; not touching it to avoid breaking something unknown"
         case .writeFailed(let detail):
-            return "falha ao escrever o package.json patchado: \(detail)"
+            return "failed to write the patched package.json: \(detail)"
         }
     }
 }
@@ -52,44 +52,44 @@ public enum VSCodeExtensionPatchError: Error, CustomStringConvertible {
 public struct VSCodeExtensionPatchStatus {
     public let extensionVersion: String
     public let wasAlreadyPatched: Bool
-    /// Não-nil quando pulamos por detectar um update em andamento (arquivo
-    /// vazio/instável) — não é sucesso nem erro, só "tenta de novo depois".
+    /// Non-nil when we skipped because we detected an update in progress (empty/
+    /// unstable file) — it's neither success nor error, just "try again later".
     public let skippedReason: String?
 }
 
-/// `claudeCode.environmentVariables` (que carrega CLAUDE_CONFIG_DIR) é
-/// declarado no `package.json` da extensão oficial com `"scope": "machine"`
-/// — segundo a documentação da Microsoft sobre scopes de configuração de
-/// extensão, isso significa "settings that can be set only in user settings
-/// or only in remote settings": o VS Code **ignora silenciosamente** esse
-/// setting quando definido em `.vscode/settings.json` de um projeto (scope
-/// workspace/folder). É a causa raiz confirmada de por que trocar de conta
-/// de um projeto nunca tinha efeito real no Claude Code, mesmo com o patch
-/// do leog (specs/03) aplicado e a janela recarregada — aquele patch
-/// resolve um problema diferente (a extensão lendo `process.env` direto em
-/// vez do setting resolvido), não a restrição de escopo em si.
+/// `claudeCode.environmentVariables` (which carries CLAUDE_CONFIG_DIR) is
+/// declared in the official extension's `package.json` with `"scope": "machine"`
+/// — per Microsoft's documentation on extension configuration scopes,
+/// this means "settings that can be set only in user settings
+/// or only in remote settings": VS Code **silently ignores** this
+/// setting when defined in a project's `.vscode/settings.json` (workspace/
+/// folder scope). This is the confirmed root cause of why switching accounts
+/// on a project never had a real effect on Claude Code, even with leog's
+/// patch (specs/03) applied and the window reloaded — that patch
+/// solves a different problem (the extension reading `process.env` directly
+/// instead of the resolved setting), not the scope restriction itself.
 ///
-/// A correção, confirmada empiricamente (troca de conta propagou sem
-/// reload extra): trocar esse `"scope"` de `"machine"` para `"window"` no
-/// `package.json` instalado — settings "window" podem ser definidos em
-/// user, workspace OU remote settings, exatamente o que precisamos (cada
-/// janela/projeto com seu próprio CLAUDE_CONFIG_DIR). `package.json` é só
-/// metadata estática lida pelo motor de configuração do VS Code, não
-/// código a interpretar — edição direta de JSON, sem JavaScriptCore.
+/// The fix, confirmed empirically (account switch propagated without an
+/// extra reload): change that `"scope"` from `"machine"` to `"window"` in the
+/// installed `package.json` — "window" settings can be defined in
+/// user, workspace OR remote settings, exactly what we need (each
+/// window/project with its own CLAUDE_CONFIG_DIR). `package.json` is just
+/// static metadata read by VS Code's configuration engine, not
+/// code to be interpreted — direct JSON editing, no JavaScriptCore.
 ///
-/// Continua precisando do patch do leog (`extension.js`, código compilado)
-/// para a parte funcional: sem ele, mesmo com o scope liberado, a extensão
-/// ainda lê `process.env.CLAUDE_CONFIG_DIR` direto em alguns storage
-/// helpers, ignorando o valor resolvido do setting.
+/// Still needs leog's patch (`extension.js`, compiled code)
+/// for the functional part: without it, even with the scope unlocked, the
+/// extension still reads `process.env.CLAUDE_CONFIG_DIR` directly in some storage
+/// helpers, ignoring the setting's resolved value.
 public enum VSCodeExtensionPatcher {
     static let targetSetting = "claudeCode.environmentVariables"
     static let patchedScope = "window"
     static let originalScope = "machine"
     private static let backupSuffix = ".claude-switcher-scope-patch.bak"
 
-    /// Localiza a instalação da extensão oficial dentro de uma raiz de
-    /// editor específica — havendo mais de uma pasta (raro, pode acontecer
-    /// durante um update), fica com a de maior versão.
+    /// Locates the official extension's installation within a specific
+    /// editor root — if there's more than one folder (rare, can happen
+    /// during an update), keeps the one with the highest version.
     public static func locateExtensionDir(in root: VSCodeEditorRoot) -> String? {
         let extensionsDir = root.extensionsDirPath
         guard let entries = try? FileManager.default.contentsOfDirectory(atPath: extensionsDir) else {
@@ -103,8 +103,8 @@ public enum VSCodeExtensionPatcher {
         return candidates.max { compareVersions($0.version, $1.version) == .orderedAscending }?.path
     }
 
-    /// Uma entrada por raiz de editor onde a extensão oficial está de fato
-    /// instalada — 0, 1 ou 2 hoje (VS Code estável/Insiders).
+    /// One entry per editor root where the official extension is actually
+    /// installed — 0, 1, or 2 today (VS Code stable/Insiders).
     public static func allExtensionDirs() -> [String] {
         VSCodeEditorRoot.allCases.compactMap { locateExtensionDir(in: $0) }
     }
@@ -114,8 +114,8 @@ public enum VSCodeExtensionPatcher {
         let prefix = "anthropic.claude-code-"
         guard name.hasPrefix(prefix) else { return nil }
         let rest = name.dropFirst(prefix.count)
-        // versão é tudo até o primeiro "-" seguido de uma letra (plataforma:
-        // darwin-arm64, darwin-x64, win32-x64 etc.) — versões são só dígitos e pontos.
+        // version is everything up to the first "-" followed by a letter (platform:
+        // darwin-arm64, darwin-x64, win32-x64, etc.) — versions are only digits and dots.
         let versionChars = rest.prefix { $0.isNumber || $0 == "." }
         return versionChars.isEmpty ? nil : String(versionChars)
     }
@@ -137,39 +137,39 @@ public enum VSCodeExtensionPatcher {
 
         guard FileManager.default.fileExists(atPath: packageJSONPath) else {
             return VSCodeExtensionPatchStatus(
-                extensionVersion: "desconhecida", wasAlreadyPatched: false,
-                skippedReason: "package.json não encontrado (update em andamento?)"
+                extensionVersion: "unknown", wasAlreadyPatched: false,
+                skippedReason: "package.json not found (update in progress?)"
             )
         }
 
         var text = try await TransientFileIO.readWithRetry(path: packageJSONPath)
         if text.isEmpty {
             return VSCodeExtensionPatchStatus(
-                extensionVersion: "desconhecida", wasAlreadyPatched: false,
-                skippedReason: "package.json vazio (update em andamento)"
+                extensionVersion: "unknown", wasAlreadyPatched: false,
+                skippedReason: "package.json empty (update in progress)"
             )
         }
 
         var parsed = parse(text)
-        // Um arquivo não-vazio mas com JSON inválido pode ser um snapshot
-        // parcial capturado no meio de uma reescrita — observa a
-        // estabilidade antes de declarar um problema real (mesma proteção
-        // que ClaudeExtensionJSPatchRunner já tem para o extension.js).
+        // A non-empty file with invalid JSON might be a partial
+        // snapshot captured mid-rewrite — observe
+        // stability before declaring a real problem (same protection
+        // that ClaudeExtensionJSPatchRunner already has for extension.js).
         if parsed == nil {
             let settled = try await TransientFileIO.readUntilStable(path: packageJSONPath, initial: text)
             if settled.changed {
                 text = settled.source
                 if text.isEmpty {
                     return VSCodeExtensionPatchStatus(
-                        extensionVersion: "desconhecida", wasAlreadyPatched: false,
-                        skippedReason: "package.json vazio (update em andamento)"
+                        extensionVersion: "unknown", wasAlreadyPatched: false,
+                        skippedReason: "package.json empty (update in progress)"
                     )
                 }
                 parsed = parse(text)
                 if parsed == nil {
                     return VSCodeExtensionPatchStatus(
-                        extensionVersion: "desconhecida", wasAlreadyPatched: false,
-                        skippedReason: "arquivo ainda instável, tenta de novo depois"
+                        extensionVersion: "unknown", wasAlreadyPatched: false,
+                        skippedReason: "file still unstable, try again later"
                     )
                 }
             }
@@ -179,7 +179,7 @@ public enum VSCodeExtensionPatcher {
             throw VSCodeExtensionPatchError.packageJSONUnreadable(packageJSONPath)
         }
 
-        let version = root["version"] as? String ?? "desconhecida"
+        let version = root["version"] as? String ?? "unknown"
 
         guard var contributes = root["contributes"] as? [String: Any],
               var configuration = contributes["configuration"] as? [String: Any],
@@ -197,9 +197,9 @@ public enum VSCodeExtensionPatcher {
             throw VSCodeExtensionPatchError.unrecognizedScope(currentScope)
         }
 
-        // Backup só na primeira vez que patcheamos essa versão específica —
-        // cada pasta de versão só é patcheada uma vez, não há "desfazer"
-        // incremental necessário depois disso.
+        // Backup only the first time we patch this specific version —
+        // each version folder is only patched once, no incremental "undo"
+        // is needed after that.
         let backupPath = packageJSONPath + backupSuffix
         if !FileManager.default.fileExists(atPath: backupPath) {
             try await TransientFileIO.retryOnTransientLock {

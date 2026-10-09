@@ -9,11 +9,11 @@ enum KeychainError: Error, CustomStringConvertible {
     var description: String {
         switch self {
         case .notFound:
-            return "nenhuma credencial encontrada no Keychain"
+            return "no credential found in Keychain"
         case .unexpectedData:
-            return "item do Keychain sem dados legíveis"
+            return "Keychain item with no readable data"
         case .osStatus(let status):
-            return "erro de Keychain (OSStatus \(status))"
+            return "Keychain error (OSStatus \(status))"
         }
     }
 }
@@ -40,8 +40,8 @@ enum Keychain {
         return data
     }
 
-    /// Remove o item — usado ao apagar uma conta por completo (specs/05).
-    /// Não lança erro se o item já não existir (idempotente).
+    /// Removes the item — used when deleting an account entirely (specs/05).
+    /// Does not throw if the item no longer exists (idempotent).
     static func deletePassword(service: String) {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,

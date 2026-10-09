@@ -1,18 +1,18 @@
 import Foundation
 
-/// Resolve o caminho absoluto do binário `claude`, em camadas da mais
-/// barata para a mais cara:
+/// Resolves the absolute path of the `claude` binary, in layers from
+/// cheapest to most expensive:
 ///
-/// 1. PATH já herdado pelo processo — instantâneo, cobre o caso comum
-///    (`cs` chamado de um terminal já tem o PATH certo).
-/// 2. Locais de instalação comuns — também instantâneo, sem spawnar nada.
-/// 3. PATH do shell de login do usuário (`ShellPath`) — só como último
-///    recurso: pode levar segundos (medido ~2s nesta máquina, por causa de
-///    plugins de prompt como oh-my-zsh/powerlevel10k). Pagar isso em todo
-///    `cs` rodado de um terminal seria uma regressão de performance sem
-///    necessidade nenhuma, já que o terminal já tem o PATH correto.
+/// 1. PATH already inherited by the process — instant, covers the common
+///    case (`cs` called from a terminal already has the right PATH).
+/// 2. Common install locations — also instant, without spawning anything.
+/// 3. PATH of the user's login shell (`ShellPath`) — only as a last
+///    resort: can take seconds (measured ~2s on this machine, because of
+///    prompt plugins like oh-my-zsh/powerlevel10k). Paying this cost on every
+///    `cs` run from a terminal would be an unnecessary performance regression,
+///    since the terminal already has the correct PATH.
 ///
-/// Resultado cacheado por processo — cada `cs`/app GUI resolve uma vez.
+/// Result cached per process — each `cs`/GUI app resolves it once.
 public enum ClaudeExecutable {
     private static var cached: String?
 
@@ -33,9 +33,9 @@ public enum ClaudeExecutable {
         if let path = search(in: ShellPath.resolved()) {
             return path
         }
-        // Não encontramos em lugar nenhum — devolve "claude" puro, deixando
-        // o Process falhar com um erro claro ("No such file or directory")
-        // em vez de travar aqui tentando mais alternativas.
+        // We found it nowhere — return plain "claude", letting
+        // Process fail with a clear error ("No such file or directory")
+        // instead of getting stuck here trying more alternatives.
         return "claude"
     }
 

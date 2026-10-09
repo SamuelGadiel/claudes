@@ -1,13 +1,13 @@
 import Foundation
 
-/// Retry/backoff compartilhado pelos dois patches da extensão Claude
-/// (`VSCodeExtensionPatcher` e `ClaudeExtensionJSPatchRunner`) — mesma
-/// classe de proteção contra timing de atualização: o VS Code pode estar no
-/// meio de extrair/escrever os arquivos da nova versão quando o
-/// `VSCodeExtensionWatcher` reage ao evento de mudança no diretório, então
-/// uma leitura imediata pode pegar um arquivo momentaneamente vazio ou
-/// parcial, e uma escrita pode esbarrar num lock transiente (AV scanner,
-/// o próprio processo que instalou, etc).
+/// Retry/backoff shared by the two Claude extension patches
+/// (`VSCodeExtensionPatcher` and `ClaudeExtensionJSPatchRunner`) — the same
+/// class of protection against update timing: VS Code may be in the
+/// middle of extracting/writing the files of the new version when
+/// `VSCodeExtensionWatcher` reacts to the directory change event, so
+/// an immediate read might catch a momentarily empty or
+/// partial file, and a write might hit a transient lock (AV scanner,
+/// the installing process itself, etc).
 enum TransientFileIO {
     static let retryDelaysNanoseconds: [UInt64] = [50_000_000, 150_000_000, 400_000_000, 1_000_000_000]
 
@@ -15,9 +15,9 @@ enum TransientFileIO {
         (try? String(contentsOfFile: path, encoding: .utf8)) ?? ""
     }
 
-    /// Enquanto a extensão instala/atualiza, o VS Code pode truncar o
-    /// arquivo antes de reescrevê-lo — uma leitura nesse instante pode
-    /// pegar vazio.
+    /// While the extension installs/updates, VS Code may truncate the
+    /// file before rewriting it — a read at that instant may
+    /// catch it empty.
     static func readWithRetry(path: String) async throws -> String {
         var source = readRaw(path: path)
         for delay in retryDelaysNanoseconds where source.isEmpty {
@@ -32,11 +32,11 @@ enum TransientFileIO {
         let changed: Bool
     }
 
-    /// Relê ao longo de uma janela pra distinguir um update em andamento de
-    /// um arquivo já assentado: se o conteúdo mudar em algum ponto, ainda
-    /// está sendo escrito; se nunca mudar, é um arquivo genuinamente
-    /// estável (e, se mesmo assim não tiver o que procuramos, é uma
-    /// regressão real, não um falso positivo de timing).
+    /// Re-reads over a window to distinguish an update in progress from
+    /// an already-settled file: if the content changes at any point, it's still
+    /// being written; if it never changes, it's a genuinely
+    /// stable file (and, if it still doesn't have what we're looking for, it's a
+    /// real regression, not a timing false positive).
     static func readUntilStable(path: String, initial: String) async throws -> StableReadResult {
         var latest = initial
         var changed = false
@@ -51,9 +51,9 @@ enum TransientFileIO {
         return StableReadResult(source: latest, changed: changed)
     }
 
-    /// Scanners de antivírus ou o próprio processo que instalou podem
-    /// segurar o arquivo aberto brevemente logo após uma atualização —
-    /// retry com backoff em vez de falhar na primeira tentativa.
+    /// Antivirus scanners or the installing process itself may
+    /// hold the file open briefly right after an update —
+    /// retry with backoff instead of failing on the first attempt.
     static func retryOnTransientLock(_ operation: () throws -> Void) async throws {
         for attempt in 0...retryDelaysNanoseconds.count {
             do {

@@ -1,9 +1,9 @@
 import Foundation
 
 public enum Slug {
-    /// "Cliente X" -> "cliente-x", "Time Mobile 2" -> "time-mobile-2".
-    /// Remove acentos, baixa caixa, troca qualquer sequência de caracteres
-    /// não alfanuméricos por um único "-", sem "-" nas pontas.
+    /// "Client X" -> "client-x", "Mobile Team 2" -> "mobile-team-2".
+    /// Removes accents, lowercases, replaces any sequence of
+    /// non-alphanumeric characters with a single "-", with no "-" at the ends.
     public static func make(from name: String) -> String {
         let folded = name.folding(options: .diacriticInsensitive, locale: Locale(identifier: "en_US"))
         let lowered = folded.lowercased()

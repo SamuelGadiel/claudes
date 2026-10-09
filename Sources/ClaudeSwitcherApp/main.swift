@@ -1,6 +1,6 @@
 import Cocoa
 
-// força rebuild com hash diferente (teste de prompt de Keychain)
+// force rebuild with a different hash (Keychain prompt test)
 let app = NSApplication.shared
 let delegate = AppDelegate()
 app.delegate = delegate

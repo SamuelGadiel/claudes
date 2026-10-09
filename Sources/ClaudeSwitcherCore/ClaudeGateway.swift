@@ -1,18 +1,18 @@
 import Foundation
 
-/// Repassa execução para o binário `claude` real, igual a "fvm flutter" para
-/// o Flutter SDK. Resolvido via PATH (/usr/bin/env), nunca hardcoded — e
-/// nunca pelo alias de shell do usuário, porque Process não herda aliases.
+/// Forwards execution to the real `claude` binary, similar to "fvm flutter" for
+/// the Flutter SDK. Resolved via PATH (/usr/bin/env), never hardcoded — and
+/// never via the user's shell alias, because Process doesn't inherit aliases.
 public enum ClaudeGateway {
-    /// Usado pelo gateway final (`cs <slug> ...`, `cs` sozinho): o processo
-    /// `cs` não tem mais nada a fazer depois, então termina com o mesmo
-    /// exit code do `claude`.
+    /// Used by the final gateway (`cs <slug> ...`, `cs` alone): the `cs`
+    /// process has nothing left to do afterward, so it exits with the same
+    /// exit code as `claude`.
     public static func run(configDir: String?, arguments: [String]) -> Never {
         exit(execute(configDir: configDir, arguments: arguments))
     }
 
-    /// Usado quando `cs` ainda precisa imprimir algo depois (ex.: `cs add`
-    /// chamando `claude auth login` e então confirmando o cadastro).
+    /// Used when `cs` still needs to print something afterward (e.g. `cs add`
+    /// calling `claude auth login` and then confirming the registration).
     @discardableResult
     public static func execute(configDir: String?, arguments: [String]) -> Int32 {
         let process = Process()
@@ -27,8 +27,8 @@ public enum ClaudeGateway {
         }
         process.environment = env
 
-        // Herda stdio diretamente (sem Pipe) para preservar o TTY — essencial
-        // para o modo interativo do Claude Code funcionar normalmente.
+        // Inherits stdio directly (no Pipe) to preserve the TTY — essential
+        // for Claude Code's interactive mode to work normally.
         process.standardInput = FileHandle.standardInput
         process.standardOutput = FileHandle.standardOutput
         process.standardError = FileHandle.standardError
@@ -36,7 +36,7 @@ public enum ClaudeGateway {
         do {
             try process.run()
         } catch {
-            FileHandle.standardError.write(Data("cs: falha ao executar claude: \(error)\n".utf8))
+            FileHandle.standardError.write(Data("cs: failed to execute claude: \(error)\n".utf8))
             return 1
         }
 

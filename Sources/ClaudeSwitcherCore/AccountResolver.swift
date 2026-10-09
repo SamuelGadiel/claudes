@@ -1,8 +1,8 @@
 import Foundation
 
-/// Resolve qual conta usar para o diretório atual: .clauderc (subindo
-/// diretórios) -> conta default -> nil (comportamento nativo, sem
-/// CLAUDE_CONFIG_DIR). nil só deve ocorrer antes da primeira conta existir.
+/// Resolves which account to use for the current directory: .clauderc (walking
+/// up directories) -> default account -> nil (native behavior, without
+/// CLAUDE_CONFIG_DIR). nil should only occur before the first account exists.
 public enum AccountResolver {
     public static func resolve(forCwd cwd: String, in file: AccountsFile) -> RegisteredAccount? {
         if let found = ClauderFile.find(startingAt: cwd),

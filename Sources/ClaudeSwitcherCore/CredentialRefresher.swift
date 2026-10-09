@@ -1,20 +1,20 @@
 import Foundation
 
-/// Força a renovação de um access token expirado antes de chamar
-/// /api/oauth/usage. Receita validada (ver plans/specs/06, inspirada em
+/// Forces the renewal of an expired access token before calling
+/// /api/oauth/usage. Validated recipe (see plans/specs/06, inspired by
 /// claude-macos-menu-usage, MIT):
 ///
-/// - `claude mcp list` é o comando confirmado a de fato bater um endpoint
-///   autenticado — `claude auth status` só reporta estado cacheado e NUNCA
-///   dispara o refresh OAuth, mesmo com o token expirado.
-/// - Via o shell de login do usuário (`-i -l`): necessário porque um app
-///   GUI lançado pelo Finder/LaunchServices não herda o PATH do terminal
-///   (diferente do `cs`, que já roda dentro de um terminal com PATH certo).
-/// - `cwd` fixado em /tmp: evita disparar prompts de TCC por tocar em
-///   ~/Desktop, ~/Documents etc.
-/// - NUNCA envia SIGTERM ao processo: interromper no meio da escrita faz o
-///   Claude Code mover a credencial para fora do Keychain. Se o timeout
-///   expirar, simplesmente paramos de esperar — o processo segue sozinho.
+/// - `claude mcp list` is the command confirmed to actually hit an
+///   authenticated endpoint — `claude auth status` only reports cached state and
+///   NEVER triggers the OAuth refresh, even with an expired token.
+/// - Via the user's login shell (`-i -l`): necessary because a GUI app
+///   launched by Finder/LaunchServices does not inherit the terminal's PATH
+///   (unlike `cs`, which already runs inside a terminal with the right PATH).
+/// - `cwd` fixed to /tmp: avoids triggering TCC prompts by touching
+///   ~/Desktop, ~/Documents, etc.
+/// - NEVER sends SIGTERM to the process: interrupting it mid-write causes
+///   Claude Code to move the credential out of the Keychain. If the timeout
+///   expires, we simply stop waiting — the process keeps running on its own.
 public enum CredentialRefresher {
     @discardableResult
     public static func refreshInBackground(configDir: String, timeout: TimeInterval = 15) -> Bool {

@@ -1,9 +1,9 @@
 import Foundation
 
-/// Checa se .vscode/settings.json está versionado sem estar no .gitignore.
-/// Ver risco documentado em plans/specs/02-integracao-vscode-sem-profiles:
-/// CLAUDE_CONFIG_DIR é um path local da máquina do usuário e nunca deveria
-/// ser commitado num projeto compartilhado.
+/// Checks whether .vscode/settings.json is tracked by git without being in
+/// .gitignore. See the risk documented in plans/specs/02-integracao-vscode-sem-profiles:
+/// CLAUDE_CONFIG_DIR is a path local to the user's machine and should never
+/// be committed in a shared project.
 enum GitRisk {
     static func warnings(forProjectPath projectPath: String, relativeFile: String) -> [String] {
         guard isInsideGitWorkTree(cwd: projectPath) else { return [] }
@@ -14,17 +14,17 @@ enum GitRisk {
 
         if isTracked(cwd: projectPath, relativePath: relativeFile) {
             return [
-                "ATENÇÃO: \(relativeFile) está versionado neste repositório e NÃO está no " +
-                ".gitignore. Escrever CLAUDE_CONFIG_DIR aqui vaza o path local da sua máquina " +
-                "para o time e força sua conta em quem mais abrir o projeto. Considere adicionar " +
-                "\(relativeFile) (ou a pasta .vscode/) ao .gitignore antes de prosseguir."
+                "WARNING: \(relativeFile) is tracked in this repository and is NOT in " +
+                ".gitignore. Writing CLAUDE_CONFIG_DIR here leaks your machine's local path " +
+                "to the team and forces your account on anyone else who opens the project. Consider adding " +
+                "\(relativeFile) (or the .vscode/ folder) to .gitignore before proceeding."
             ]
         }
 
         return [
-            "Aviso: \(relativeFile) ainda não está commitado nem no .gitignore deste " +
-            "repositório. Se for um projeto compartilhado, adicione ao .gitignore antes de " +
-            "rodar git add."
+            "Warning: \(relativeFile) is not yet committed nor in this " +
+            "repository's .gitignore. If this is a shared project, add it to .gitignore before " +
+            "running git add."
         ]
     }
 

@@ -1,8 +1,8 @@
 import AppKit
 
-/// NSAlert nativo, centralizado na tela — diferente de um
-/// `.confirmationDialog` do SwiftUI, que fica espremido dentro do nosso
-/// popover pequeno.
+/// Native NSAlert, centered on screen — unlike a SwiftUI
+/// `.confirmationDialog`, which gets squeezed inside our
+/// small popover.
 enum ConfirmationAlert {
     static func confirmDestructive(title: String, message: String, confirmTitle: String) -> Bool {
         let alert = NSAlert()
@@ -10,7 +10,7 @@ enum ConfirmationAlert {
         alert.informativeText = message
         alert.alertStyle = .warning
         alert.addButton(withTitle: confirmTitle)
-        alert.addButton(withTitle: "Cancelar")
+        alert.addButton(withTitle: "Cancel")
         NSApp.activate(ignoringOtherApps: true)
         return alert.runModal() == .alertFirstButtonReturn
     }

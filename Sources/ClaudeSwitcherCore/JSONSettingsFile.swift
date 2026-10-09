@@ -6,19 +6,19 @@ public enum JSONSettingsFileError: Error, CustomStringConvertible {
 
     public var description: String {
         switch self {
-        case .invalidJSON(let detail): return "arquivo de settings inválido: \(detail)"
-        case .ioError(let detail): return "erro de IO: \(detail)"
+        case .invalidJSON(let detail): return "invalid settings file: \(detail)"
+        case .ioError(let detail): return "IO error: \(detail)"
         }
     }
 }
 
-/// Leitura/escrita de arquivos JSON de settings (VS Code, Claude Code) com
-/// merge seguro: nunca sobrescreve o arquivo inteiro, só as chaves que o
-/// chamador decide alterar. Usado por VSCodeSettings.
+/// Reading/writing of settings JSON files (VS Code, Claude Code) with a
+/// safe merge: never overwrites the whole file, only the keys the
+/// caller decides to change. Used by VSCodeSettings.
 public enum JSONSettingsFile {
     public static func read(path: String, warnings: inout [String]) throws -> [String: Any] {
         guard let data = FileManager.default.contents(atPath: path) else {
-            throw JSONSettingsFileError.ioError("não consegui ler \(path)")
+            throw JSONSettingsFileError.ioError("could not read \(path)")
         }
         return try parse(data: data, warnings: &warnings)
     }
@@ -27,22 +27,22 @@ public enum JSONSettingsFile {
         let outData = try JSONSerialization.data(
             withJSONObject: root, options: [.prettyPrinted, .sortedKeys]
         )
-        // JSONSerialization escapa "/" como "\/" por padrão — válido em JSON,
-        // mas verboso e fora do padrão que essas ferramentas escrevem.
-        // Desescapar é seguro: dentro de uma string JSON, "\/" sempre
-        // significa "/" puro.
+        // JSONSerialization escapes "/" as "\/" by default — valid JSON,
+        // but verbose and not the standard these tools write.
+        // Unescaping is safe: inside a JSON string, "\/" always
+        // means a plain "/".
         guard var jsonText = String(data: outData, encoding: .utf8) else {
-            throw JSONSettingsFileError.ioError("falha ao serializar JSON")
+            throw JSONSettingsFileError.ioError("failed to serialize JSON")
         }
         jsonText = jsonText.replacingOccurrences(of: "\\/", with: "/")
         try jsonText.write(toFile: path, atomically: true, encoding: .utf8)
     }
 
-    /// Tenta parse estrito primeiro; se falhar, tenta de novo removendo
-    /// comentários JSONC (VS Code e Claude Code aceitam comentários em
-    /// settings.json, JSON puro não). Se precisar da segunda tentativa, os
-    /// comentários originais são perdidos ao salvar — isso é avisado, nunca
-    /// escondido.
+    /// Tries strict parsing first; if it fails, tries again removing
+    /// JSONC comments (VS Code and Claude Code accept comments in
+    /// settings.json, plain JSON doesn't). If the second attempt is needed, the
+    /// original comments are lost on save — this is warned about, never
+    /// hidden.
     private static func parse(data: Data, warnings: inout [String]) throws -> [String: Any] {
         if let obj = try? JSONSerialization.jsonObject(with: data), let dict = obj as? [String: Any] {
             return dict
@@ -54,14 +54,14 @@ public enum JSONSettingsFile {
                let obj = try? JSONSerialization.jsonObject(with: strippedData),
                let dict = obj as? [String: Any] {
                 warnings.append(
-                    "o arquivo tinha comentários (JSONC) — eles serão perdidos ao salvar esta mudança."
+                    "the file had comments (JSONC) — they will be lost when this change is saved."
                 )
                 return dict
             }
         }
 
         throw JSONSettingsFileError.invalidJSON(
-            "não foi possível interpretar o JSON existente; nada foi sobrescrito"
+            "could not parse the existing JSON; nothing was overwritten"
         )
     }
 

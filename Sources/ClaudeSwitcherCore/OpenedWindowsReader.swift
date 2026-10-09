@@ -5,9 +5,9 @@ public struct OpenedWindow: Sendable {
     public let name: String
 }
 
-/// Lê as janelas do VS Code abertas agora a partir do storage.json dele —
-/// nenhuma permissão especial necessária, path completo (sem ambiguidade
-/// de nomes). Ver plans/specs/05-app-status-bar.
+/// Reads the VS Code windows currently open from its storage.json —
+/// no special permission needed, full path (no ambiguity
+/// from names). See plans/specs/05-app-status-bar.
 public enum OpenedWindowsReader {
     static let storagePath = (
         "~/Library/Application Support/Code/User/globalStorage/storage.json" as NSString

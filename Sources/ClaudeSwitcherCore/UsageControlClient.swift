@@ -7,29 +7,29 @@ public enum UsageControlError: Error, CustomStringConvertible {
 
     public var description: String {
         switch self {
-        case .processLaunchFailed(let detail): return "falha ao executar claude: \(detail)"
-        case .timeout: return "claude não respondeu a tempo"
-        case .decoding(let error): return "erro ao decodificar resposta: \(error)"
+        case .processLaunchFailed(let detail): return "failed to execute claude: \(detail)"
+        case .timeout: return "claude did not respond in time"
+        case .decoding(let error): return "error decoding response: \(error)"
         }
     }
 }
 
-/// Busca o uso real da conta invocando o próprio binário `claude` no modo de
-/// protocolo que o Claude Agent SDK usa (`--input-format stream-json
-/// --output-format stream-json`) e mandando uma control_request
-/// `{"subtype":"get_usage"}` — o MESMO mecanismo que a extensão oficial do
-/// VS Code usa para a tela "Account & Usage" (confirmado lendo
+/// Fetches the account's real usage by invoking the `claude` binary itself in the
+/// protocol mode the Claude Agent SDK uses (`--input-format stream-json
+/// --output-format stream-json`) and sending a control_request
+/// `{"subtype":"get_usage"}` — the SAME mechanism the official VS Code
+/// extension uses for the "Account & Usage" screen (confirmed by reading
 /// `extension.js`: `usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET`
-/// manda `{subtype:"get_usage"}`).
+/// sends `{subtype:"get_usage"}`).
 ///
-/// Isto substitui `UsageAPIClient` (chamada HTTP direta a
-/// `/api/oauth/usage`) como fonte primária: aquele endpoint falhava de
-/// forma consistente e inexplicada para a conta Pessoal (rate limit ou
-/// 401 recorrentes) enquanto claude.ai, o CLI e a extensão sempre
-/// funcionaram — delegar a chamada real para o binário oficial (que sabe
-/// se autenticar/chamar corretamente, decida lá dentro como decidir)
-/// elimina essa diferença de comportamento. Funciona sob demanda, sem
-/// exigir nenhuma sessão ativa nem interação prévia.
+/// This replaces `UsageAPIClient` (direct HTTP call to
+/// `/api/oauth/usage`) as the primary source: that endpoint consistently
+/// and inexplicably failed for the Personal account (recurring rate limit or
+/// 401) while claude.ai, the CLI, and the extension always
+/// worked — delegating the real call to the official binary (which knows
+/// how to authenticate/call correctly, however it decides internally)
+/// eliminates that behavioral difference. Works on demand, without
+/// requiring any active session or prior interaction.
 public enum UsageControlClient {
     public static func fetch(configDir: String, timeout: TimeInterval = 10) throws -> UsageResponse {
         let process = Process()
@@ -89,9 +89,9 @@ public enum UsageControlClient {
         stdoutPipe.fileHandleForReading.readabilityHandler = nil
         try? stdinPipe.fileHandleForWriting.close()
         if process.isRunning {
-            // Terminate aqui é seguro: isto é uma leitura (get_usage), não
-            // um fluxo de renovação de credencial no meio de uma escrita —
-            // diferente de CredentialRefresher, que nunca mata o processo.
+            // Terminate here is safe: this is a read (get_usage), not
+            // a credential renewal flow in the middle of a write —
+            // unlike CredentialRefresher, which never kills the process.
             process.terminate()
         }
 

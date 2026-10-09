@@ -24,14 +24,14 @@ public struct ExtraUsage: Decodable, Sendable {
     }
 }
 
-/// Resposta de GET https://api.anthropic.com/api/oauth/usage — o mesmo
-/// endpoint (não documentado publicamente, mas usado pelo próprio Claude
-/// Code) que alimenta a status line dele. Ver plans/specs/06.
+/// Response from GET https://api.anthropic.com/api/oauth/usage — the same
+/// endpoint (not publicly documented, but used by Claude Code
+/// itself) that feeds its status line. See plans/specs/06.
 ///
-/// A resposta real traz muito mais campos do que modelamos aqui (nomes de
-/// código internos tipo "tangelo", "iguana_necktie" — provavelmente feature
-/// flags/experimentos, nulos nas contas testadas) — Codable ignora qualquer
-/// chave não declarada, então só listamos o que o painel de fato usa.
+/// The real response carries many more fields than we model here (internal
+/// code names like "tangelo", "iguana_necktie" — probably feature
+/// flags/experiments, null on the tested accounts) — Codable ignores any
+/// undeclared key, so we only list what the panel actually uses.
 public struct UsageResponse: Decodable, Sendable {
     public let fiveHour: UsageWindow?
     public let sevenDay: UsageWindow?
@@ -56,23 +56,23 @@ public enum UsageAPIError: Error, CustomStringConvertible {
     public var description: String {
         switch self {
         case .unauthorized:
-            return "token rejeitado pela Anthropic — pode ter expirado ou sido revogado"
+            return "token rejected by Anthropic — it may have expired or been revoked"
         case .rateLimited(let retryAfter):
-            return "endpoint de uso com rate limit" + (retryAfter.map { " (retry em \(Int($0))s)" } ?? "")
+            return "usage endpoint rate limited" + (retryAfter.map { " (retry in \(Int($0))s)" } ?? "")
         case .http(let code):
-            return "endpoint de uso retornou HTTP \(code)"
+            return "usage endpoint returned HTTP \(code)"
         case .transport(let error):
-            return "erro de rede: \(error.localizedDescription)"
+            return "network error: \(error.localizedDescription)"
         case .decoding(let error):
-            return "erro ao decodificar resposta: \(error)"
+            return "error decoding response: \(error)"
         }
     }
 }
 
-/// A API retorna datas ISO 8601 com microssegundos e offset "+00:00"
-/// (ex.: "2026-10-12T08:59:59.551118+00:00") — o formatador padrão do
-/// JSONDecoder (`.iso8601`) não aceita fração de segundo, por isso o parse
-/// customizado com fallback.
+/// The API returns ISO 8601 dates with microseconds and a "+00:00" offset
+/// (e.g. "2026-10-12T08:59:59.551118+00:00") — JSONDecoder's default
+/// formatter (`.iso8601`) doesn't accept fractional seconds, hence the
+/// custom parse with fallback.
 enum UsageDateParsing {
     static let withFractionalSeconds: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
@@ -93,7 +93,7 @@ enum UsageDateParsing {
             return date
         }
         throw DecodingError.dataCorruptedError(
-            in: container, debugDescription: "Data em formato inesperado: \(string)"
+            in: container, debugDescription: "Date in unexpected format: \(string)"
         )
     }
 }

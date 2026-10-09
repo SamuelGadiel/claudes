@@ -11,20 +11,20 @@ public enum AccountCreationError: Error, CustomStringConvertible {
 
     public var description: String {
         switch self {
-        case .emptyName: return "nome não pode ser vazio"
-        case .invalidSlug: return "não foi possível gerar um slug válido a partir do nome"
-        case .reservedSlug(let slug): return "'\(slug)' é um comando reservado — escolha outro nome ou informe um slug"
-        case .duplicateAccount: return "já existe uma conta com esse nome ou slug"
-        case .duplicateConfigDir(let dir): return "já existe uma conta registrada apontando para \(dir)"
-        case .directoryCreationFailed(let detail): return "erro ao criar diretório: \(detail)"
-        case .notFound(let identifier): return "conta '\(identifier)' não encontrada"
+        case .emptyName: return "name cannot be empty"
+        case .invalidSlug: return "could not generate a valid slug from the name"
+        case .reservedSlug(let slug): return "'\(slug)' is a reserved command — choose another name or provide a slug"
+        case .duplicateAccount: return "an account with that name or slug already exists"
+        case .duplicateConfigDir(let dir): return "an account already registered pointing to \(dir) already exists"
+        case .directoryCreationFailed(let detail): return "error creating directory: \(detail)"
+        case .notFound(let identifier): return "account '\(identifier)' not found"
         }
     }
 }
 
-/// Criação de conta — lógica compartilhada entre `cs add` e o fluxo
-/// equivalente na GUI (specs/05), para nunca duplicar as mesmas validações
-/// em dois lugares.
+/// Account creation — logic shared between `cs add` and the equivalent
+/// flow in the GUI (specs/05), so the same validations are never duplicated
+/// in two places.
 extension AccountsConfig {
     @discardableResult
     public static func addAccount(
@@ -66,11 +66,11 @@ extension AccountsConfig {
         return account
     }
 
-    /// Remove do registro, apaga o diretório (`CLAUDE_CONFIG_DIR`) e a
-    /// credencial correspondente no Keychain — limpeza completa, pedida
-    /// explicitamente pelo usuário (specs/05: "remover" deve remover de
-    /// verdade, não deixar pastas órfãs). Promove outra conta a default se
-    /// a removida era a default e ainda sobram contas.
+    /// Removes it from the registry, deletes the directory (`CLAUDE_CONFIG_DIR`)
+    /// and the corresponding credential in the Keychain — a complete cleanup,
+    /// explicitly requested by the user (specs/05: "remove" should actually
+    /// remove, not leave orphan folders). Promotes another account to default if
+    /// the removed one was the default and accounts still remain.
     @discardableResult
     public static func removeAccount(slug: String) throws -> RegisteredAccount {
         var (file, _) = load()

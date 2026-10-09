@@ -1,20 +1,20 @@
 import Foundation
 
-/// Instala (ou atualiza) um link simbólico para o binário `cs` em execução
-/// dentro de um diretório que já esteja no PATH do usuário — o mesmo padrão
-/// do "Shell Command: Install 'code' in PATH" do VS Code, ou do "docker" do
-/// Docker Desktop. Reusável tanto pelo próprio CLI (`cs install-cli`) quanto
-/// pela futura GUI de status bar na primeira abertura — nenhum dos dois faz
-/// mais do que isso; não há IPC nem dependência entre os dois binários.
+/// Installs (or updates) a symbolic link to the running `cs` binary
+/// inside a directory that is already in the user's PATH — the same pattern
+/// as VS Code's "Shell Command: Install 'code' in PATH", or Docker Desktop's
+/// "docker". Reusable both by the CLI itself (`cs install-cli`) and
+/// by the future status bar GUI on first launch — neither does
+/// more than this; there's no IPC or dependency between the two binaries.
 public enum ShellInstallError: Error, CustomStringConvertible {
     case noWritableDirectory([String])
 
     public var description: String {
         switch self {
         case .noWritableDirectory(let tried):
-            return "Não encontrei um diretório gravável para instalar o 'cs' (tentei: "
-                + "\(tried.joined(separator: ", "))). Rode com sudo, ou crie um dos "
-                + "diretórios acima e adicione ao PATH manualmente."
+            return "Could not find a writable directory to install 'cs' (tried: "
+                + "\(tried.joined(separator: ", "))). Run with sudo, or create one of the "
+                + "directories above and add it to PATH manually."
         }
     }
 }
@@ -26,19 +26,19 @@ public struct ShellInstallResult {
 }
 
 public enum ShellInstall {
-    /// Em ordem de preferência: /usr/local/bin é o destino convencional no
-    /// macOS para binários instalados fora de um package manager (quase
-    /// sempre já existe e já está no PATH de qualquer shell padrão);
-    /// ~/.local/bin é o fallback sem precisar de permissão elevada.
+    /// In order of preference: /usr/local/bin is the conventional destination on
+    /// macOS for binaries installed outside a package manager (it almost
+    /// always already exists and is already in the PATH of any standard shell);
+    /// ~/.local/bin is the fallback that doesn't need elevated permission.
     static let candidateDirs = [
         "/usr/local/bin",
         ("~/.local/bin" as NSString).expandingTildeInPath,
     ]
 
-    /// Caminho absoluto do binário `cs` que está rodando agora, com symlinks
-    /// resolvidos. Deliberadamente dinâmico (não hardcoded): o .app pode
-    /// estar em ~/Applications, /Applications, ou ser rodado via `swift run`
-    /// durante o desenvolvimento.
+    /// Absolute path of the `cs` binary currently running, with symlinks
+    /// resolved. Deliberately dynamic (not hardcoded): the .app may
+    /// be in ~/Applications, /Applications, or be run via `swift run`
+    /// during development.
     public static func currentExecutablePath() -> String {
         let arg0 = CommandLine.arguments[0]
         let absolute = arg0.hasPrefix("/")
@@ -54,8 +54,8 @@ public enum ShellInstall {
 
         for dir in candidateDirs {
             if !fm.fileExists(atPath: dir) {
-                // ~/.local/bin pode não existir ainda; criamos só dentro da
-                // home do usuário — nunca em /usr/local sem ele já existir.
+                // ~/.local/bin may not exist yet; we only create it inside the
+                // user's home — never under /usr/local unless it already exists.
                 guard dir.hasPrefix(NSHomeDirectory()) else { continue }
                 try? fm.createDirectory(atPath: dir, withIntermediateDirectories: true)
             }

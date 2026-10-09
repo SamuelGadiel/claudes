@@ -1,34 +1,34 @@
 import ClaudeSwitcherCore
 import UserNotifications
 
-/// Avisa via notificação nativa quando uma conta expirou ou está prestes a
-/// expirar — observa `refreshTokenExpiresAt`, nunca `expiresAt` (o access
-/// token expira e renova sozinho o tempo todo, isso é normal; ver
-/// specs/01-gerenciamento-contas-storage). Checagem periódica, sem nenhuma
-/// chamada de rede — só lê o Keychain, mesmo mecanismo de `cs list`.
+/// Warns via native notification when an account has expired or is about to
+/// expire — watches `refreshTokenExpiresAt`, never `expiresAt` (the access
+/// token expires and renews itself all the time, that's normal; see
+/// specs/01-gerenciamento-contas-storage). Periodic check, with no
+/// network call at all — only reads the Keychain, the same mechanism as `cs list`.
 @MainActor
 final class ExpiryMonitor {
     private var timer: Timer?
-    /// Evita notificar repetidamente pela mesma condição a cada checagem —
-    /// só dispara de novo se a condição for resolvida e voltar a ocorrer.
+    /// Avoids notifying repeatedly for the same condition on every check —
+    /// only fires again if the condition is resolved and then happens again.
     private var notifiedKeys: Set<String> = []
 
-    // 5min original relia o Keychain de todas as contas com o app inteiro
-    // em background, pra sempre — mesma classe de bug já corrigida no poll
-    // de uso (spec 06), só que neste componente não tinha sido coberta: era
-    // a causa dos prompts de senha do Keychain reaparecendo periodicamente
-    // mesmo com o painel fechado. 6h ainda avisa com folga dentro da janela
-    // de 24h, lendo o Keychain ~72x menos.
+    // The original 5min re-read the Keychain for every account with the whole app
+    // in the background, forever — the same class of bug already fixed in the usage
+    // poll (spec 06), except it hadn't been covered in this component: it was
+    // the cause of Keychain password prompts periodically reappearing
+    // even with the panel closed. 6h still warns with plenty of margin within the
+    // 24h window, reading the Keychain ~72x less.
     private let checkInterval: TimeInterval = 6 * 3600
     private let warningWindow: TimeInterval = 24 * 3600
 
     func start() {
-        // requestAuthorization é assíncrono — agendar notificações antes do
-        // callback retornar significa agendar enquanto a permissão ainda
-        // está "not determined"; o sistema aceita o agendamento mas depois
-        // descarta a notificação quando chega a hora de exibir, porque a
-        // permissão só foi concedida DEPOIS. Por isso check()/timer só
-        // começam dentro do callback.
+        // requestAuthorization is asynchronous — scheduling notifications before
+        // the callback returns means scheduling while permission is still
+        // "not determined"; the system accepts the scheduling but then
+        // discards the notification when it's time to display it, because
+        // permission was only granted AFTERWARD. That's why check()/timer only
+        // start inside the callback.
         requestAuthorization { [weak self] in
             guard let self else { return }
             self.timer?.invalidate()
@@ -39,12 +39,12 @@ final class ExpiryMonitor {
         }
     }
 
-    /// UNUserNotificationCenter exige um .app bundle de verdade, assinado
-    /// (mesmo ad-hoc) — sem isso, crasha o processo inteiro com
-    /// NSInternalInconsistencyException, ou nega silenciosamente sem nunca
-    /// mostrar o prompt. Uma notificação é secundária; nunca deveria
-    /// derrubar o app. Ver specs/05-app-status-bar para o histórico completo
-    /// dessa investigação.
+    /// UNUserNotificationCenter requires a real, signed .app bundle
+    /// (even ad-hoc) — without that, it crashes the entire process with
+    /// NSInternalInconsistencyException, or silently denies without ever
+    /// showing the prompt. A notification is secondary; it should never
+    /// take down the app. See specs/05-app-status-bar for the complete history
+    /// of this investigation.
     private var notificationsAvailable: Bool {
         Bundle.main.bundleIdentifier != nil
     }
@@ -73,16 +73,16 @@ final class ExpiryMonitor {
             if refreshExpiresAt < now {
                 notify(
                     key: expiredKey,
-                    title: "Sessão expirada: \(account.name)",
-                    body: "Faça login de novo: rode 'cs \(account.slug) auth login' no terminal."
+                    title: "Session expired: \(account.name)",
+                    body: "Log in again: run 'cs \(account.slug) auth login' in the terminal."
                 )
             } else {
                 notifiedKeys.remove(expiredKey)
                 if refreshExpiresAt.timeIntervalSince(now) < warningWindow {
                     notify(
                         key: expiringKey,
-                        title: "Sessão expira em breve: \(account.name)",
-                        body: "Expira \(refreshExpiresAt.formatted(date: .abbreviated, time: .shortened))."
+                        title: "Session expiring soon: \(account.name)",
+                        body: "Expires \(refreshExpiresAt.formatted(date: .abbreviated, time: .shortened))."
                     )
                 } else {
                     notifiedKeys.remove(expiringKey)

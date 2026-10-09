@@ -10,45 +10,50 @@ import Foundation
 /// (`anthropic.claude-code-<nova-versão>-darwin-arm64`) com os arquivos
 /// originais, sem patch nenhum.
 ///
-/// Observa `~/.vscode/extensions` via `DispatchSource` (kqueue) — o mesmo
-/// mecanismo reativo que a própria extensão oficial usa internamente para
-/// observar mudanças de configuração (ver `watchGlobalClaudeFileAt` no
+/// Observa `extensions/` de cada `VSCodeEditorRoot` presente (estável
+/// e/ou Insiders) via `DispatchSource` (kqueue) — o mesmo mecanismo
+/// reativo que a própria extensão oficial usa internamente para observar
+/// mudanças de configuração (ver `watchGlobalClaudeFileAt` no
 /// `extension.js` dela), em vez de checar em intervalos.
 @MainActor
 final class VSCodeExtensionWatcher {
-    private var source: DispatchSourceFileSystemObject?
-    private var fileDescriptor: Int32 = -1
+    private var sources: [DispatchSourceFileSystemObject] = []
     private var debounceWorkItem: DispatchWorkItem?
 
     func start() {
         applyNow()
 
-        let path = ("~/.vscode/extensions" as NSString).expandingTildeInPath
-        fileDescriptor = open(path, O_EVTONLY)
+        for root in VSCodeEditorRoot.allCases {
+            watch(path: root.extensionsDirPath)
+        }
+    }
+
+    func stop() {
+        for source in sources { source.cancel() }
+        sources = []
+    }
+
+    /// Diretório pode não existir ainda (editor nunca instalado nesta
+    /// máquina) — `open` falha silenciosamente nesse caso, sem problema:
+    /// simplesmente não observamos essa raiz.
+    private func watch(path: String) {
+        let fileDescriptor = open(path, O_EVTONLY)
         guard fileDescriptor >= 0 else { return }
 
         let source = DispatchSource.makeFileSystemObjectSource(
             fileDescriptor: fileDescriptor, eventMask: .write, queue: .main
         )
         source.setEventHandler { [weak self] in self?.scheduleApply() }
-        source.setCancelHandler { [weak self] in
-            guard let self, self.fileDescriptor >= 0 else { return }
-            close(self.fileDescriptor)
-            self.fileDescriptor = -1
-        }
+        source.setCancelHandler { close(fileDescriptor) }
         source.resume()
-        self.source = source
+        sources.append(source)
     }
 
-    func stop() {
-        source?.cancel()
-        source = nil
-    }
-
-    /// Debounce: a extração de um update pode gerar mais de um evento de
-    /// escrita no diretório em sequência rápida (pasta antiga removida,
-    /// nova criada) — espera a poeira baixar antes de ler o package.json,
-    /// pra não pegar um estado intermediário.
+    /// Debounce compartilhado entre todas as raízes observadas: a extração
+    /// de um update pode gerar mais de um evento de escrita em sequência
+    /// rápida (pasta antiga removida, nova criada) — espera a poeira
+    /// baixar antes de reler os arquivos, pra não pegar um estado
+    /// intermediário.
     private func scheduleApply() {
         debounceWorkItem?.cancel()
         let item = DispatchWorkItem { [weak self] in self?.applyNow() }

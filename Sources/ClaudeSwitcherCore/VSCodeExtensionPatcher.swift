@@ -1,5 +1,29 @@
 import Foundation
 
+/// Raiz de instalação de extensões de um editor compatível com o formato do
+/// VS Code (`<raiz>/extensions/anthropic.claude-code-<versão>-<plataforma>`).
+/// Hoje só VS Code estável e Insiders — a mesma extensão oficial roda nos
+/// dois, cada um com sua própria cópia instalada, então os dois precisam
+/// ser patchados independentemente se ambos estiverem presentes. Forks como
+/// Cursor/Windsurf usam esse mesmo formato de pasta e poderiam ser
+/// adicionados aqui no futuro, mas não foram validados — fora de escopo
+/// por ora.
+public enum VSCodeEditorRoot: String, CaseIterable, CustomStringConvertible {
+    case stable = "~/.vscode"
+    case insiders = "~/.vscode-insiders"
+
+    public var extensionsDirPath: String {
+        (rawValue as NSString).expandingTildeInPath + "/extensions"
+    }
+
+    public var description: String {
+        switch self {
+        case .stable: return "VS Code"
+        case .insiders: return "VS Code Insiders"
+        }
+    }
+}
+
 public enum VSCodeExtensionPatchError: Error, CustomStringConvertible {
     case extensionNotFound
     case packageJSONUnreadable(String)
@@ -10,7 +34,7 @@ public enum VSCodeExtensionPatchError: Error, CustomStringConvertible {
     public var description: String {
         switch self {
         case .extensionNotFound:
-            return "extensão anthropic.claude-code não encontrada em ~/.vscode/extensions"
+            return "extensão anthropic.claude-code não encontrada"
         case .packageJSONUnreadable(let detail):
             return "não consegui ler/decodificar o package.json da extensão mesmo após esperar " +
                 "estabilizar (não é timing de update) — \(detail)"
@@ -63,11 +87,11 @@ public enum VSCodeExtensionPatcher {
     static let originalScope = "machine"
     private static let backupSuffix = ".claude-switcher-scope-patch.bak"
 
-    /// Localiza a instalação da extensão oficial — havendo mais de uma
-    /// pasta (raro, pode acontecer durante um update), fica com a de maior
-    /// versão.
-    public static func locateExtensionDir() -> String? {
-        let extensionsDir = ("~/.vscode/extensions" as NSString).expandingTildeInPath
+    /// Localiza a instalação da extensão oficial dentro de uma raiz de
+    /// editor específica — havendo mais de uma pasta (raro, pode acontecer
+    /// durante um update), fica com a de maior versão.
+    public static func locateExtensionDir(in root: VSCodeEditorRoot) -> String? {
+        let extensionsDir = root.extensionsDirPath
         guard let entries = try? FileManager.default.contentsOfDirectory(atPath: extensionsDir) else {
             return nil
         }
@@ -77,6 +101,12 @@ public enum VSCodeExtensionPatcher {
             return (extensionsDir + "/" + entry, version)
         }
         return candidates.max { compareVersions($0.version, $1.version) == .orderedAscending }?.path
+    }
+
+    /// Uma entrada por raiz de editor onde a extensão oficial está de fato
+    /// instalada — 0, 1 ou 2 hoje (VS Code estável/Insiders).
+    public static func allExtensionDirs() -> [String] {
+        VSCodeEditorRoot.allCases.compactMap { locateExtensionDir(in: $0) }
     }
 
     /// "anthropic.claude-code-2.1.281-darwin-arm64" -> "2.1.281"
@@ -102,10 +132,7 @@ public enum VSCodeExtensionPatcher {
     }
 
     @discardableResult
-    public static func ensurePatched() async throws -> VSCodeExtensionPatchStatus {
-        guard let extensionDir = locateExtensionDir() else {
-            throw VSCodeExtensionPatchError.extensionNotFound
-        }
+    public static func ensurePatched(extensionDir: String) async throws -> VSCodeExtensionPatchStatus {
         let packageJSONPath = extensionDir + "/package.json"
 
         guard FileManager.default.fileExists(atPath: packageJSONPath) else {

@@ -125,9 +125,17 @@ final class StatusBarController: NSObject {
         Task { @MainActor in
             let summary = await ClaudePatchCoordinator.applyAll(log: false)
             let alert = NSAlert()
-            alert.messageText = summary.hadRealError ? "Patch não aplicado por completo" : "Patch verificado"
-            alert.informativeText = "\(summary.scopeMessage)\n\(summary.jsMessage)"
-            alert.alertStyle = summary.hadRealError ? .warning : .informational
+            if summary.entries.isEmpty {
+                alert.messageText = "Nenhuma instalação encontrada"
+                alert.informativeText = "Não achei a extensão Claude nem no VS Code nem no VS Code Insiders."
+                alert.alertStyle = .informational
+            } else {
+                alert.messageText = summary.hadRealError ? "Patch não aplicado por completo" : "Patch verificado"
+                alert.informativeText = summary.entries
+                    .map { "\($0.root):\n\($0.scopeMessage)\n\($0.jsMessage)" }
+                    .joined(separator: "\n\n")
+                alert.alertStyle = summary.hadRealError ? .warning : .informational
+            }
             alert.addButton(withTitle: "OK")
             NSApp.activate(ignoringOtherApps: true)
             alert.runModal()

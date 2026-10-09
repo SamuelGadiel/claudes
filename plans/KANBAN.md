@@ -7,6 +7,8 @@
 
 - [ ] "Verificar atualizações" real + "Sobre" customizado com versão de referência da extensão VS Code testada (hoje são placeholder/painel padrão do macOS) → `specs/05-app-status-bar`
 - [ ] **P9** Validar notificação de expiração visualmente (lógica implementada e correta — `requestAuthorization`/`add()` sem erro quando autorizado — mas falta confirmação visual; bloqueado por uma provável proteção anti-abuso do TCC do macOS contra pedidos de permissão de bundle ids novos em sequência rápida, ver "Bloqueado" abaixo) → `specs/05-app-status-bar`
+- [ ] **Notificação: patch reaplicado** — quando `VSCodeExtensionWatcher` detectar uma atualização da extensão Claude e reaplicar os patches, notificar o usuário (não só `NSLog`), para que ele saiba que a extensão atualizou e que o claude-switcher já reagiu. Lapidar o texto/trigger exato quando chegarmos no serviço de notificações → `specs/03-patch-extensao-vscode`
+- [ ] **Notificação: threshold de uso** — avisar quando o uso cruzar os mesmos thresholds de cor da barra (75% warning, 90% critical), não só quando expirar a sessão. Lapidar quando chegarmos no serviço de notificações → `specs/06-monitoramento-uso-expiracao`
 - [ ] Repassar sinais (Ctrl+C) em sessões longas/`--bg` — funcionou nos testes manuais mas não foi validado exaustivamente → `specs/07-cli-gateway`
 - [ ] **Chats compartilhados** — usuário tem ideias a desenvolver, ainda não discutido a fundo
 - [ ] Empacotar o `.app` de verdade (bundle, ícone, assinatura/notarização, distribuição) → `specs/05-app-status-bar`

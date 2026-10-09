@@ -8,7 +8,7 @@ public enum ClaudeExtensionJSPatchError: Error, CustomStringConvertible {
     public var description: String {
         switch self {
         case .extensionNotFound:
-            return "extensão anthropic.claude-code não encontrada em ~/.vscode/extensions"
+            return "extensão anthropic.claude-code não encontrada"
         case .envPatchPointNotFound(let version):
             return "não encontrei o ponto de patch esperado no extension.js da versão \(version) — " +
                 "a Anthropic pode ter mudado o formato minificado; precisa atualizar os regexes"
@@ -38,10 +38,7 @@ public enum ClaudeExtensionJSPatchRunner {
     private static let backupSuffix = ".claude-switcher-js-patch.bak"
 
     @discardableResult
-    public static func ensurePatched() async throws -> ClaudeExtensionJSPatchStatus {
-        guard let extensionDir = VSCodeExtensionPatcher.locateExtensionDir() else {
-            throw ClaudeExtensionJSPatchError.extensionNotFound
-        }
+    public static func ensurePatched(extensionDir: String) async throws -> ClaudeExtensionJSPatchStatus {
         let jsPath = extensionDir + "/extension.js"
         let version = extensionVersion(extensionDir: extensionDir)
 

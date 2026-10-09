@@ -22,7 +22,7 @@ regex), esse é editar um campo de um JSON estático — **já implementado**:
 `DispatchSource` quando a extensão atualiza). Ver kanban para o resumo
 completo da investigação.
 
-## Problema de origem (patch do leog — ainda não incorporado)
+## Problema de origem (resolvido — ver "Decisão final" abaixo)
 
 A extensão `anthropic.claude-code` tem *storage helpers* internos que leem
 `process.env.CLAUDE_CONFIG_DIR` diretamente, enquanto
@@ -33,63 +33,93 @@ do VS Code. Resultado: a extensão pode continuar lendo a credencial errada
 (a do `CLAUDE_CONFIG_DIR` default) mesmo com a config correta no projeto —
 isso é a causa raiz do "fallback para conta pessoal" relatado (P3 original).
 
-## Decisão: vendorizar, não reimplementar
+## Decisão original: vendorizar via JavaScriptCore (substituída)
 
-`leog/claude-code-config-dir-patcher-vscode` resolve isso fazendo
-substituição de regex sobre o bundle minificado (`extension.js`) da extensão
-oficial. A lógica central está isolada em dois arquivos **puros, sem
-dependência de `vscode` ou `fs`**: `patch-core.js` e `patch-regexes.js`
-(confirmado lendo o código — ver comentário no topo de `patch-core.js`).
+A decisão original era vendorizar `patch-core.js`/`patch-regexes.js` de
+`leog/claude-code-config-dir-patcher-vscode` como arquivos JS e rodá-los via
+`JavaScriptCore`. Motivo da época: achar que a lógica era complexa demais
+pra portar sem duplicar manutenção.
 
-Em vez de portar essa lógica pra Swift (o que criaria manutenção duplicada
-toda vez que o upstream mudar o bundle minificado), vamos:
+## Decisão final: reimplementado nativamente em Swift, não vendorizado
 
-1. **Vendorizar** os dois arquivos (`patch-core.js`, `patch-regexes.js`) em
-   `vendor/claude-code-patcher/`, com atribuição e licença MIT preservada,
-   anotando o commit/tag de origem num `VENDORED_FROM.md`.
-2. **Executá-los via `JavaScriptCore`** (framework nativo do macOS, sem
-   precisar de Node instalado) a partir do Swift: carregar os dois arquivos
-   num `JSContext`, chamar `applyPatch(source)` passando o conteúdo do
-   `extension.js` instalado do usuário, receber a string patchada de volta.
-3. **Atualizar por sincronização de arquivo**, não por fork: quando o leog
-   atualizar os regexes (upstream muda o bundle), rodamos um script local
-   que baixa as versões novas de `patch-core.js`/`patch-regexes.js` do repo
-   dele e substitui o conteúdo vendorizado, sem tocar no resto do código
-   (que é específico de extensão VS Code / Sentry, que não usamos).
+Motivador da mudança: a extensão `leog.claude-code-config-dir-patcher`
+ficou **um dia inteiro desatualizada** depois de uma atualização da
+extensão oficial, deixando o usuário sem conseguir trocar de conta até o
+autor corrigir o patch dele. Depender do cronograma de terceiros pra reagir
+a mudanças no bundle da Anthropic não é aceitável para o fluxo principal do
+app.
+
+Lendo `patch-core.js`/`patch-regexes.js` com esse objetivo em mente: a
+lógica é só duas transformações regex puras sobre uma string (`analyze` +
+`applyPatch`/`source.replace`), sem estado, sem I/O — trivialmente portável
+para `NSRegularExpression` (ICU regex, suporta os mesmos backreferences e
+grupos de captura usados nos padrões originais). A complexidade real estava
+toda na camada de I/O em volta (retry contra leituras durante um update em
+andamento, lock transiente ao escrever), que também foi portada fielmente.
+
+**Implementado**: `ClaudeExtensionJSPatcher` (lógica pura, port 1:1 dos
+regexes) + `ClaudeExtensionJSPatchRunner` (I/O: localizar, ler com retry,
+backup, escrever com retry) + `ClaudePatchCoordinator` (une esse patch com
+o de scope numa chamada só, usada pelo `VSCodeExtensionWatcher` e pelo item
+"Reaplicar patch" do menu). Créditos e licença MIT em `ATTRIBUTIONS.md` —
+a descoberta dos padrões de regex e do problema em si é trabalho do leog,
+mesmo a implementação sendo nossa.
+
+**Validado**: aplicar nosso patch no `extension.js` original produz uma
+saída byte-a-byte idêntica à do patch do leog (mesmo tamanho exato). Nosso
+`analyze()` reconhece corretamente o formato que o patch dele já tinha
+produzido (compatibilidade de leitura preservada, útil enquanto os dois
+coexistirem na mesma máquina). Testado de ponta a ponta via I/O real
+(restaurando `extension.js`/`package.json` originais e reaplicando),
+incluindo idempotência.
+
+**Consequência**: a extensão `leog.claude-code-config-dir-patcher` deixou
+de ser uma dependência necessária — pode ser desinstalada. Decisão de
+quando fazer isso é do usuário.
 
 ## Fluxo de aplicação do patch
 
-1. Localizar a instalação da extensão oficial:
-   `~/.vscode/extensions/anthropic.claude-code-*/dist/extension.js` (ou
-   equivalente no Cursor/outros forks, se formos suportar — **não assumir**,
-   confirmar o path exato quando for implementar).
-2. Fazer backup (`extension.js.bak`) antes de qualquer escrita.
-3. Rodar `analyze()` (do `patch-core.js`) pra saber se já está patchado,
-   patchável, ou se o needle não bate (versão não reconhecida).
-4. Se patchável e não patchado: aplicar, escrever o resultado, verificar
-   idempotência (reaplicar não deve mudar nada) antes de considerar sucesso.
-5. Reaplicar automaticamente quando a extensão for atualizada pelo VS Code
-   (detectar mudança de versão/mtime do `extension.js` e reagir).
+1. Localizar a instalação da extensão oficial via
+   `VSCodeExtensionPatcher.locateExtensionDir()` (glob em
+   `~/.vscode/extensions/anthropic.claude-code-*`, fica com a de maior
+   versão se houver mais de uma). macOS only — não suporta Cursor/outros
+   forks nem Windows/Linux.
+2. Backup (`extension.js.claude-switcher-js-patch.bak`) antes da primeira
+   escrita.
+3. `ClaudeExtensionJSPatcher.analyze()` decide se já está patchado,
+   patchável, ou se o needle não bate (versão não reconhecida — lança
+   `ClaudeExtensionJSPatchError.envPatchPointNotFound`, nunca tenta
+   heurística alternativa).
+4. Se patchável e não patchado: aplica, escreve, confirmado idempotente nos
+   testes (reaplicar não muda nada).
+5. Reaplicado automaticamente via `VSCodeExtensionWatcher` (`DispatchSource`
+   sobre `~/.vscode/extensions`, reativo — ver specs 02) sempre que a
+   extensão é atualizada.
 
 ## Verificação de compatibilidade (evitar quebra silenciosa)
 
-Adaptar a lógica de `scripts/check-upstream-patchability.mjs` do leog
-(também reaproveitável, mesma licença) para, periodicamente ou no startup do
-nosso app, checar se o `extension.js` atualmente instalado ainda bate com os
-needles vendorizados. Se não bater: alertar o usuário na status bar ("patch
-desatualizado — pode haver fallback de conta") em vez de falhar silenciosamente.
+Não implementado um checker preventivo contra builds futuras (equivalente a
+`scripts/check-upstream-patchability.mjs` do leog, que baixa builds do
+Marketplace). Hoje a falha é visível na hora: `envPatchPointNotFound` lança
+erro explícito (logado pelo `VSCodeExtensionWatcher`, ou mostrado no
+`NSAlert` do item "Reaplicar patch"), não falha silenciosamente. Considerar
+esse checker preventivo como melhoria futura, não bloqueador.
 
 ## Edge cases
 
 - Needle não encontrado (`envPatchable == false` e `envPatched == false`) →
-  versão da extensão oficial mudou de forma incompatível. Não tentar aplicar
-  heurística alternativa — alertar e aguardar atualização do vendor.
-- Usuário restaura/reinstala a extensão oficial → patch se perde, precisa
-  reaplicar (hook de detecção de mudança do arquivo).
+  versão da extensão oficial mudou de forma incompatível — erro explícito,
+  nunca heurística alternativa.
+- `extension.js` vazio/parcial durante um update em andamento → detectado e
+  tratado com retry/backoff (`ClaudeExtensionJSPatchRunner`), nunca lança
+  erro nesse caso (seria um falso positivo).
+- Usuário restaura/reinstala a extensão oficial → patch se perde; o
+  `VSCodeExtensionWatcher` detecta a mudança no diretório e reaplica.
 - `extension.js` de plataforma diferente (o leog menciona que win32 difere
-  dos demais) → não relevante pro nosso caso (macOS only), mas documentar.
+  dos demais) → não relevante, projeto é macOS only.
 
 ## Fora de escopo
 
-- Telemetria/Sentry do projeto do leog — não vendorizar `telemetry.json` nem
-  a lógica de analytics, só os dois arquivos de patch puro.
+- Telemetria/Sentry do projeto do leog — nunca foi relevante, não
+  reimplementado.
+- Suporte a Cursor/outros forks do VS Code, Windows, Linux.

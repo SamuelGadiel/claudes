@@ -1,0 +1,81 @@
+# Kanban — claude-switcher
+
+> Atualizar este arquivo a cada sessão de trabalho. Cada item referencia o
+> ponto original do pedido (P1–P13) e a spec correspondente em `specs/`.
+
+## Backlog
+
+- [ ] **P3/P13** Vendorizar patch do leog + runtime JavaScriptCore para aplicar no `extension.js` da extensão oficial → `specs/03-patch-extensao-vscode` (**adiado de propósito** — usuário continua com a extensão do leog por enquanto)
+- [ ] "Verificar atualizações" real + "Sobre" customizado (hoje são placeholder/painel padrão do macOS) → `specs/05-app-status-bar`
+- [ ] **P9** Validar notificação de expiração visualmente (lógica implementada e correta — `requestAuthorization`/`add()` sem erro quando autorizado — mas falta confirmação visual; bloqueado por uma provável proteção anti-abuso do TCC do macOS contra pedidos de permissão de bundle ids novos em sequência rápida, ver "Bloqueado" abaixo) → `specs/05-app-status-bar`
+- [ ] Ajustar `ClaudeGateway` para resolver o shell de login do usuário quando chamado pela GUI (app lançado via Finder/LaunchServices não herda PATH do terminal) → `specs/07-cli-gateway`
+- [ ] Repassar sinais (Ctrl+C) em sessões longas/`--bg` — funcionou nos testes manuais mas não foi validado exaustivamente → `specs/07-cli-gateway`
+- [ ] Empacotar o `.app` de verdade (bundle, ícone, assinatura/notarização, distribuição) → `specs/05-app-status-bar`
+
+## Em andamento
+
+_(vazio)_
+
+## Concluído
+
+- [x] Investigação técnica: formato de credenciais no Keychain, estrutura de `~/.claude/projects`, `sessions`, `file-history`
+- [x] Confirmado o algoritmo do sufixo de Keychain: `sha256(CLAUDE_CONFIG_DIR)[:8]`
+- [x] **P1/P9** Descoberta de contas + leitura de `expiresAt`/`refreshTokenExpiresAt`/`subscriptionType` do Keychain, sem tocar em `accessToken`/`refreshToken` → `specs/01-gerenciamento-contas-storage`
+- [x] Confirmado: alerta de expiração deve observar `refreshTokenExpiresAt`, não `expiresAt` (access token expira e renova sozinho em segundo plano)
+- [x] **P1/P2/P12** Escrita de `.vscode/settings.json` via merge seguro (JSONSerialization, path absoluto, nunca `~`), com detecção de risco de versionamento no git → `specs/02-integracao-vscode-sem-profiles`
+- [x] Confirmado o algoritmo de nome de diretório de projeto: `path absoluto com "/" -> "-"` (não é hash), validado contra 10 projetos reais
+- [x] **P4** `sync-sessions`: copia `.jsonl` de sessão entre contas sem sobrescrever → `specs/04-sincronizacao-sessoes`
+- [x] Clone e leitura do `leog/claude-code-config-dir-patcher-vscode` (`patch-core.js`, `patch-regexes.js`, `check-upstream-patchability.mjs`)
+- [x] Decisões arquiteturais fechadas: stack SwiftUI, patch vendorizado, sync-on-switch, eliminação de profiles
+- [x] **P5** CLI `cs` como gateway de terminal (inspirado no `fvm`): `cs add/remove/list/set/default` + `cs <slug> [args...]` repassando para o `claude` real → `specs/07-cli-gateway`
+- [x] `.clauderc` (nome lógico da conta, portátil/versionável) como fonte de verdade do projeto; `.vscode/settings.json` rebaixado a projeção derivada só para a extensão oficial
+- [x] Esquema de conta default: obrigatória a partir da primeira conta criada, promovida automaticamente em `add`/`remove`
+- [x] Validado end-to-end: `cs trabalho auth status` e `cs pessoal auth status` retornam o e-mail correto de cada conta real
+- [x] Refactor: lógica extraída para target de library `ClaudeSwitcherCore`, `cs` passou a só fazer parsing/prints — preparado para o app de status bar depender do mesmo Core sem duplicação. Core nunca imprime direto (retorna mensagens como dado).
+- [x] `cs install-cli` / `ShellInstall`: symlink para o binário em execução num diretório do PATH (`/usr/local/bin` → fallback `~/.local/bin`), resolvido em runtime (funciona igual hoje e dentro do futuro `.app`). Validado: `/usr/local/bin` sem permissão nesta máquina, caiu para `~/.local/bin` e funcionou de ponta a ponta.
+- [x] Confirmado por design: `cs` nunca depende do app de status bar estar rodando (sem IPC; ambos leem o mesmo `accounts.json`/Keychain)
+- [x] **P6** RESOLVIDO (não mais bloqueado): endpoint real `GET https://api.anthropic.com/api/oauth/usage` confirmado investigando dois apps open source (MIT) + issue pública `anthropics/claude-code#31021`. Headers, modelo de resposta, política de backoff/poll e estratégia de refresh de token documentados em `specs/06-monitoramento-uso-expiracao`.
+- [x] Decisão: lista de projetos abertos no painel vem do `storage.json` do VS Code (path completo, sem ambiguidade), sem tentar detectar qual janela está em foco (descartado: título é customizável pelo usuário, geometria de janelas maximizadas é idêntica)
+- [x] Decisão: painel customizado (NSPopover + SwiftUI) no clique esquerdo, menu clássico (NSMenu) no clique direito
+- [x] Validado: leitura de `CLAUDE_CONFIG_DIR` real e cwd de processos `claude` em execução via `sysctl`/`KERN_PROCARGS2` + `proc_pidinfo`/`PROC_PIDVNODEPATHINFO`, sem nenhuma permissão especial — detecta sessões de terminal fora do VS Code
+- [x] Decisão: poll de uso só dispara com projeto aberto ou sessão de terminal ativa; refresh forçado ao abrir o painel (debounce de 15s só contra abre/fecha repetido)
+- [x] Confirmado: não é possível trocar a conta de um processo já em execução (env fixo); "trocar" numa sessão de terminal atualiza o `.clauderc`, válido na próxima execução
+- [x] `OpenedWindowsReader`: lê janelas do VS Code abertas via `storage.json`, testado com os 2 projetos reais abertos
+- [x] `RunningClaudeSessions`: detecção de processos `claude` via `sysctl`/`KERN_PROCARGS2` (env real) + `proc_pidinfo` (cwd real), filtra processos gerenciados por editor. Testado com processo fake seguro (cópia de `sleep`) simulando uma sessão de terminal — detectou PID, conta e cwd corretamente
+- [x] `cs status`: comando novo que lista projetos abertos + sessões de terminal com a conta de cada um — útil tanto como debug quanto feature permanente para quem prefere terminal
+- [x] **P6** `UsageAPIClient`/`AccessToken`/`CredentialRefresher` implementados e validados contra as duas contas reais via `cs usage <slug>` — conta Trabalho retornou dados reais (5h=0%, semana=76%), conta Pessoal disparou o fluxo completo de renovação de token revogado e recebeu o 429 real documentado pela issue de referência
+- [x] Corrigido parse de data (API usa ISO8601 com microssegundos e offset, não o formato padrão do `JSONDecoder`)
+- [x] Scaffold do app de status bar: `NSStatusItem` + `NSPopover` (SwiftUI, clique esquerdo) + `NSMenu` clássico (clique direito) — validado rodando de verdade (screenshot do usuário), mostrando projetos abertos e contas reais
+- [x] **Achado de ambiente**: processos GUI lançados a partir do ambiente de execução do assistente ficam com `NSStatusItem` posicionado fora da tela (`X=-4036`, confirmado via `CGWindowList`) — não é bug do código, é uma limitação de sessão desse ambiente. Validação visual de UI depende de o usuário rodar e reportar.
+- [x] Troca de conta real no painel: projetos VS Code e sessões de terminal, ambos com menu "Trocar" chamando `.clauderc`/`VSCodeSettings` de verdade. Validado com screenshots do usuário.
+- [x] Seção "Sessões de terminal" integrada ao painel, reaproveitando `RunningClaudeSessions` — validado (com a ressalva de um processo de teste preso em estado uninterruptible do macOS, não relacionado ao nosso código)
+- [x] Abas de uso (Pessoal/Trabalho) com barras de progresso integradas, consumindo `UsageAPIClient` — validado end-to-end pelo usuário, incluindo o fluxo de erro/rate limit real
+- [x] Corrigido bug de popover não recalculando tamanho quando o conteúdo SwiftUI cresce depois de aberto (`NSHostingController.sizingOptions = [.preferredContentSize]`)
+- [x] Poll condicional (3min, só com projeto/sessão ativa) + debounce de 15s + cache do último resultado bem-sucedido (nunca mostra tela de erro vazia se já tinha dado bom antes) → `specs/06-monitoramento-uso-expiracao`
+- [x] **CORREÇÃO CRÍTICA**: o poll de uso rodava em background o dia inteiro, mesmo com o painel fechado — causa raiz mais provável do rate limit persistente na conta Pessoal (tier `default_claude_ai`, mais restrito que o `default_raven` da conta Trabalho, nunca tendo chance de se recuperar). Corrigido: `PanelViewModel` agora é possuído pelo `StatusBarController`, poll só roda enquanto o popover está de fato visível → `specs/06-monitoramento-uso-expiracao`
+- [x] Monitor de expiração (`ExpiryMonitor`) implementado: observa `refreshTokenExpiresAt`, nunca re-notifica a mesma condição, corrigido bug de ordem assíncrona (agendava notificação antes da autorização ser resolvida). Lógica confirmada correta via logs (`granted=true`, `add() error=nil`); validação visual ainda pendente (ver "Bloqueado")
+- [x] **ARQUITETURA FINAL DE USO**: `UsageControlClient` — invoca o próprio `claude --input-format stream-json --output-format stream-json` e manda uma control_request `{"subtype":"get_usage"}`, o mesmo protocolo que a extensão oficial usa para a tela "Account & Usage" (confirmado lendo `extension.js` dela). Funciona sob demanda, a qualquer momento, sem sessão prévia. Validado via `cs usage pessoal`/`cs usage trabalho` E end-to-end no app real (painel SwiftUI, ambas as abas) — confirmado pelo usuário → `specs/06-monitoramento-uso-expiracao`
+- [x] Removido por completo o mecanismo de statusLine hook (código e configuração nas duas contas) — tecnicamente funcionava, mas rejeitado pelo usuário por só popular depois de uma interação, não "sob demanda" como ele queria
+- [x] **P5** Adicionar/remover conta direto na GUI — lógica extraída para `AccountsConfig.addAccount`/`removeAccount` no Core (compartilhada com `cs add`/`cs remove`, sem duplicação). Formulário inline (nome → slug automático) + menu "..." na seção Contas → `specs/05-app-status-bar`
+- [x] **Login embutido no painel, sem terminal externo**: `LoginSessionController` controla `claude auth login` diretamente via stdin/stdout (Pipe) — mesma técnica do `UsageControlClient`. Mostra "Faça login no navegador que abriu" + campo pra colar o código (quando pedido); confirmado funcionando ponta a ponta pelo usuário, incluindo o caso onde o callback do browser confirma sozinho sem precisar de código manual. Fecha automaticamente em caso de sucesso (sem clique extra), já na aba da conta logada
+- [x] Abandonado `TerminalLauncher` (AppleScript `do script` / arquivo `.command` + `open`) — ambos confirmados não confiáveis em teste real (comando "digitado" mas nunca executado, tela em branco sem erro); removido do código
+- [x] Detecção de "conta sem login" (`needsLogin`, via `AccountDiscovery.status`) — evita que `UsageControlClient` fique preso esperando um fluxo de login interativo que nunca chegaria
+- [x] Confirmação de remoção migrada de `.confirmationDialog` (SwiftUI, espremido no popover pequeno) para `NSAlert` nativo centralizado na tela
+- [x] **Remoção agora é completa**: apaga o diretório (`CLAUDE_CONFIG_DIR`) e a credencial no Keychain, não só o registro — pedido explícito do usuário (antes deixava pastas órfãs). Confirmação mais explícita sobre a ação ser destrutiva/irreversível, tanto na GUI quanto no `cs remove` (que ganhou prompt de confirmação, antes era direto)
+- [x] Limpeza de diretórios/credenciais órfãos de testes anteriores (`.claude-momo`, `.claude-testee`, `.claude-testeee`, `.claude-testeeeeeee`)
+- [x] **Rodada de lapidação do painel** (feedback de teste real do usuário), todos os pontos:
+  - `accountStatuses` virou cache por conta em vez de reler o Keychain inteiro a cada `refresh()` (add/remove/troca de aba) — eliminava prompts duplicados; conta recém-criada recebe status "sem login" sem tocar o Keychain
+  - `NSPopover` voltou a `.transient` (fecha ao clicar fora, como esperado); `keepPopoverOpen` segura o painel aberto só durante as janelas de risco real — fluxo de login (abre browser) e `NSAlert` de confirmação de remoção (ambos são janelas do sistema que roubam o foco)
+  - `removeAccount` agora re-seleciona e carrega o uso da conta restante — antes voltava para a primeira aba mas deixava o uso em branco
+  - Formulário de nova conta ganhou campo de slug: acompanha o nome digitado até ser editado manualmente, e então para de ser sobrescrito
+  - Cor da barra de uso: investigado o bundle JS real do site claude.ai (chunk `shared-8`, função `qF`) — 3 estágios reais (`normal` <75%, `warning` 75–89% em `#fab219`, `critical` ≥90% em `#d03b3b`), bem mais granular que a extensão do VS Code (que só tem 2). Barra customizada (`UsageProgressBar`) substituiu o `ProgressView` nativo — trilha de fundo na mesma cor do estágio, translúcida, batendo com o visual do site
+  - Textos de "reinicia": sessão (5h) em formato relativo ("Reinicia em Xh Ymin"), semana em formato absoluto ("Reinicia segunda (12) às 06:00"), replicando a distinção do site
+  - Animação de crescimento da barra (0% → valor) restaurada via `@State` + `.id(slug)` — anima do zero ao trocar de aba/abrir o painel, e suavemente entre polls da mesma conta
+
+## Investigado e descartado
+
+- [x] **`security unlock-keychain` (técnica do fastlane) para evitar prompts repetidos de Keychain**: descartado. `unlock-keychain` resolve lock/unlock do keychain inteiro (já sempre desbloqueado numa sessão gráfica normal) — problema completamente diferente da ACL por item que nos afeta. O fastlane funciona em CI porque cria um keychain novo e controla a ACL desde a importação dos certificados; nosso caso é ler um item que o próprio Claude Code CLI já criou, com ACL que não controlamos. Forçar algo parecido enfraqueceria proteção real de segurança sem necessidade — a assinatura de código estável no `.app` empacotado já resolve isso de forma correta (autoriza uma vez por conta, nunca mais).
+
+## Bloqueado / precisa decisão
+
+- [ ] **Validação visual de notificação de expiração**: `requestAuthorization` passou a negar silenciosamente (sem mostrar prompt) depois de testar vários bundle identifiers novos em sequência rápida (Test, Test2, Test3) — suspeita de proteção anti-abuso do TCC do macOS. Confirmado via Ajustes do Sistema → Notificações: só o primeiro bundle (que funcionou) aparece listado, os seguintes nunca foram registrados. Retomar mais tarde, com um único bundle id, sem testes repetidos em sequência.

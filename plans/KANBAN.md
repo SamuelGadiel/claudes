@@ -3,25 +3,29 @@
 > Atualizar este arquivo a cada sessão de trabalho. Cada item referencia o
 > ponto original do pedido (P1–P13) e a spec correspondente em `specs/`.
 
-## Backlog
+## Backlog — MVP (precisa para fechar esta fase)
+
+- [ ] **Chats compartilhados** — usuário tem ideias a desenvolver, ainda não discutido a fundo. Próximo grande assunto
+- [ ] Empacotar o `.app` de verdade (bundle, ícone, assinatura/notarização, distribuição) → `specs/05-app-status-bar`
+- [ ] **P9** Validar notificação de expiração visualmente — lógica pronta e correta, só falta confirmação visual; bloqueado por uma provável proteção anti-abuso do TCC contra bundle ids novos testados em sequência (ver "Bloqueado" abaixo). **Deve resolver sozinho** assim que o `.app` tiver um bundle id estável (empacotamento acima), em vez de um binário de dev recompilado a cada `swift build` → `specs/05-app-status-bar`
+
+## Backlog — próxima versão (pós-MVP)
 
 - [ ] "Verificar atualizações" real + "Sobre" customizado com versão de referência da extensão VS Code testada (hoje são placeholder/painel padrão do macOS) → `specs/05-app-status-bar`
-- [ ] **P9** Validar notificação de expiração visualmente (lógica implementada e correta — `requestAuthorization`/`add()` sem erro quando autorizado — mas falta confirmação visual; bloqueado por uma provável proteção anti-abuso do TCC do macOS contra pedidos de permissão de bundle ids novos em sequência rápida, ver "Bloqueado" abaixo) → `specs/05-app-status-bar`
 - [ ] **Notificação: patch reaplicado** — quando `VSCodeExtensionWatcher` detectar uma atualização da extensão Claude e reaplicar os patches, notificar o usuário (não só `NSLog`), para que ele saiba que a extensão atualizou e que o claude-switcher já reagiu. Lapidar o texto/trigger exato quando chegarmos no serviço de notificações → `specs/03-patch-extensao-vscode`
 - [ ] **Notificação: threshold de uso** — avisar quando o uso cruzar os mesmos thresholds de cor da barra (75% warning, 90% critical), não só quando expirar a sessão. Lapidar quando chegarmos no serviço de notificações → `specs/06-monitoramento-uso-expiracao`
 - [ ] Repassar Ctrl+C numa sessão rodando por **horas** (não dá pra testar de forma prática em sessão de trabalho — sem motivo pra achar que quebraria, já que o mecanismo não depende de duração, mas nunca forçado) → `specs/07-cli-gateway`
-- [ ] **Chats compartilhados** — usuário tem ideias a desenvolver, ainda não discutido a fundo
-- [ ] Empacotar o `.app` de verdade (bundle, ícone, assinatura/notarização, distribuição) → `specs/05-app-status-bar`
 - [ ] **Visão futura (não priorizado)**: suporte a outros editores com extensão Claude além do VS Code (Cursor, Windsurf, IntelliJ etc.) — projeto vai ser publicado para outras pessoas, então faz sentido cobrir qualquer lugar onde exista uma extensão Claude a patchear, não só o editor que o próprio usuário usa hoje → `specs/03-patch-extensao-vscode`
 - [ ] **Abrir o painel já na aba da conta do projeto com a janela ativa** — ex.: projeto A ativo → ícone abre já na conta do projeto A; projeto B ativo → já na conta de B. Precisa: (1) detectar qual janela do VS Code está em foco no momento do clique (o usuário mesmo reconhece que pode esbarrar em gambiarra — "ver janela ativa" não é algo que o macOS expõe de forma trivial e confiável), (2) decidir o comportamento sem nenhum projeto ativo, (3) **deve ser opt-in**, configurável pelo usuário (não o padrão) → depende da janela de configurações abaixo
 - [ ] **Janela de configurações/dashboard** (não só o popover da status bar) — uma janela normal do Mac com: todas as opções de config (incluindo o toggle acima), lista de todas as contas com uso de cada uma (dashboard), adicionar conta por ali também. Caminho para o app crescer além de "só a status bar" → `specs/05-app-status-bar`
 - [ ] **Iniciar o app no login do Mac** (launch at login) → `specs/05-app-status-bar`
 - [ ] **Atualização automática configurável** (liga/desliga) — junto com "Verificar atualizações" real, e a UI de configuração entraria na janela de configurações acima → `specs/05-app-status-bar`
 
-## Backlog — preparação para publicar no GitHub (open source)
+## Backlog — preparação para publicar no GitHub (open source, pós-MVP)
 
-Nada disso bloqueia o MVP (chats compartilhados). Documentado agora para não
-esquecer, a ser priorizado quando o projeto estiver pronto para distribuição.
+Nada disso bloqueia o MVP (chats compartilhados + empacotamento). Documentado
+agora para não esquecer, a ser priorizado quando o projeto estiver pronto
+para distribuição.
 
 - [ ] **Internacionalização do projeto inteiro**: código, comentários, commits futuros, README — tudo em inglês, para alcance maior. Specs/kanban em `plans/` são documentação de processo interno, não necessariamente precisam seguir a mesma regra (decidir quando chegar nesse ponto)
 - [ ] **README** com guia de instalação (incluindo via Homebrew, ver abaixo) e visão geral do projeto
@@ -29,7 +33,7 @@ esquecer, a ser priorizado quando o projeto estiver pronto para distribuição.
 - [ ] **Wiki no GitHub** documentando o processo todo — as descobertas, por que cada correção foi necessária, como cada uma funciona e o que exatamente modifica, com uma seção por decisão técnica importante tomada ao longo do projeto (ex.: o achado do scope "machine", a investigação do leog, etc.)
 - [ ] **CI/CD via GitHub Actions**: build automatizado, validações em PR, possivelmente um bot de revisão
 - [ ] **Distribuição via Homebrew**: configurar o próprio repositório como tap
-- [ ] **Revisão de arquitetura antes de escrever testes**: projeto começou como prova de conceito via linha de comando (`swift build`), sem considerar se Xcode/outra estrutura seria mais apropriada para um projeto Swift idiomático e publicável. Usuário não é desenvolvedor Swift e quer uma avaliação externa de boas práticas de mercado antes de prosseguir — importante para que colaboradores consigam entender, debugar e contribuir
+- [ ] **Revisão de arquitetura antes de escrever testes**: Swift Package Manager puro confirmado como abordagem adequada (não precisa de `.xcodeproj` — mesmo padrão de projetos Swift sérios como swift-algorithms/swift-collections da Apple e Vapor; Xcode abre um `Package.swift` diretamente). Falta: organizar melhor as camadas pensando em testabilidade (Core já isolado da UI, bom começo) e adicionar um target de testes no `Package.swift`
 - [ ] **Testes**: unitários, de componente, de fluxo, do CLI — nenhum existe hoje. Depende do item de revisão de arquitetura acima (estrutura testável)
 
 ## Em andamento

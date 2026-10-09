@@ -14,6 +14,8 @@
 - [ ] **README** com guia de instalação (incluindo via Homebrew, ver abaixo) e visão geral do projeto
 - [ ] **LICENSE** do projeto (decidir qual)
 - [ ] **Distribuição via Homebrew**: configurar o próprio repositório como tap
+- [ ] **Nome definitivo do projeto** — "claude-switcher" é provisório; precisa de decisão do usuário (afeta bundle id, repositório, README, Homebrew tap — bloqueia vários outros itens do MVP)
+- [ ] **Ícone do app** — precisa de decisão visual/aprovação do usuário; bloqueia o empacotamento do `.app`
 
 ## Backlog — próxima versão (pós-MVP)
 
@@ -28,6 +30,7 @@
 - [ ] **CI/CD via GitHub Actions**: build automatizado, validações em PR, possivelmente um bot de revisão
 - [ ] **Revisão de arquitetura antes de escrever testes**: Swift Package Manager puro confirmado como abordagem adequada (não precisa de `.xcodeproj` — mesmo padrão de projetos Swift sérios como swift-algorithms/swift-collections da Apple e Vapor; Xcode abre um `Package.swift` diretamente). Falta: organizar melhor as camadas pensando em testabilidade (Core já isolado da UI, bom começo) e adicionar um target de testes no `Package.swift`
 - [ ] **Testes**: unitários, de componente, de fluxo, do CLI — nenhum existe hoje. Depende do item de revisão de arquitetura acima (estrutura testável)
+- [ ] **Banner/social preview do repositório no GitHub** — cosmético, pode esperar
 
 ## Em andamento
 

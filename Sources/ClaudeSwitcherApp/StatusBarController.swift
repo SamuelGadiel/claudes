@@ -84,7 +84,7 @@ final class StatusBarController: NSObject {
         } else {
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
             NSApp.activate(ignoringOtherApps: true)
-            viewModel.startPolling()
+            viewModel.prepareForDisplay()
         }
     }
 

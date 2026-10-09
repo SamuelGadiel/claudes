@@ -275,6 +275,21 @@ final class PanelViewModel: ObservableObject {
         }
     }
 
+    /// Chamado pelo StatusBarController toda vez que o popover abre — não dá
+    /// para confiar em `.onAppear` da SwiftUI view para isso: um NSPopover
+    /// reaberto não necessariamente remonta a hierarquia (a NSHostingController
+    /// fica viva em memória, só a NSView some/aparece), então sem isso a
+    /// lista de projetos/sessões ficava presa no estado da primeira abertura
+    /// — um projeto aberto no VS Code depois disso só aparecia reiniciando
+    /// o app inteiro.
+    func prepareForDisplay() {
+        refresh()
+        if selectedAccountSlug == nil, let slug = accounts.first?.slug {
+            selectAccount(slug)
+        }
+        startPolling()
+    }
+
     func startPolling() {
         pollTimer?.invalidate()
         pollTimer = Timer.scheduledTimer(withTimeInterval: pollInterval, repeats: true) { [weak self] _ in
@@ -429,17 +444,6 @@ struct PanelView: View {
         }
         .padding()
         .frame(width: 320)
-        .onAppear {
-            viewModel.refresh()
-            let slug = viewModel.selectedAccountSlug ?? viewModel.accounts.first?.slug
-            if let slug {
-                viewModel.selectAccount(slug)
-            }
-            viewModel.startPolling()
-        }
-        .onDisappear {
-            viewModel.stopPolling()
-        }
     }
 
     private func confirmAndRemove(_ account: RegisteredAccount) {

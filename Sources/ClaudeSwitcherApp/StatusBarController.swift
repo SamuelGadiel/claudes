@@ -94,7 +94,7 @@ final class StatusBarController: NSObject {
             title: "Verificar atualizações", action: #selector(checkForUpdates), keyEquivalent: ""
         )
         let reapplyVSCodePatch = NSMenuItem(
-            title: "Reaplicar patch no VS Code", action: #selector(reapplyVSCodePatch), keyEquivalent: ""
+            title: "Reaplicar patch na extensão Claude", action: #selector(reapplyVSCodePatch), keyEquivalent: ""
         )
         let about = NSMenuItem(
             title: "Sobre o Claude Switcher", action: #selector(showAbout), keyEquivalent: ""
@@ -126,7 +126,7 @@ final class StatusBarController: NSObject {
         do {
             let status = try VSCodeExtensionPatcher.ensurePatched()
             alert.messageText = status.wasAlreadyPatched ? "Patch já estava aplicado" : "Patch aplicado"
-            alert.informativeText = "Extensão VS Code \(status.extensionVersion)."
+            alert.informativeText = "Extensão Claude \(status.extensionVersion)."
             alert.alertStyle = .informational
         } catch {
             alert.messageText = "Não consegui aplicar o patch"

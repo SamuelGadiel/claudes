@@ -60,12 +60,12 @@ final class VSCodeExtensionWatcher {
         do {
             let status = try VSCodeExtensionPatcher.ensurePatched()
             if !status.wasAlreadyPatched {
-                NSLog("claude-switcher: patch de scope (re)aplicado na extensão VS Code \(status.extensionVersion)")
+                NSLog("claude-switcher: patch de scope (re)aplicado na extensão Claude \(status.extensionVersion)")
             }
         } catch VSCodeExtensionPatchError.extensionNotFound {
             // Sem VS Code/extensão instalada — nada a fazer.
         } catch {
-            NSLog("claude-switcher: falha ao verificar/aplicar patch da extensão VS Code: \(error)")
+            NSLog("claude-switcher: falha ao verificar/aplicar patch da extensão Claude: \(error)")
         }
     }
 }

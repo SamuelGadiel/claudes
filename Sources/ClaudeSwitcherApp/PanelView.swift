@@ -22,6 +22,12 @@ struct AccountUsageState {
     var errorMessage: String?
 }
 
+struct AccountAuthInfo {
+    var email: String?
+    var orgName: String?
+    var subscriptionType: String?
+}
+
 @MainActor
 final class PanelViewModel: ObservableObject {
     @Published var accounts: [RegisteredAccount] = []
@@ -43,6 +49,10 @@ final class PanelViewModel: ObservableObject {
     /// UsageControlClient travar esperando um fluxo de login interativo que
     /// nunca chegaria (processo preso até o timeout).
     @Published var accountStatuses: [String: AccountStatus] = [:]
+    /// E-mail/organização/plano — vem de `claude auth status`, não do
+    /// Keychain (que não tem e-mail). Carregado uma vez por conta (nunca
+    /// muda sozinho), não repetido a cada poll de uso.
+    @Published var authInfoStates: [String: AccountAuthInfo] = [:]
     /// true enquanto o fluxo de login está ativo — nesse período o popover
     /// não deve fechar sozinho (o `claude auth login` abre o browser, que
     /// rouba o foco, e o fim do login relê o Keychain, que pode pedir
@@ -58,6 +68,9 @@ final class PanelViewModel: ObservableObject {
     private var pollTimer: Timer?
 
     init() {
+        let (file, _) = AccountsConfig.load()
+        accounts = file.accounts
+        defaultSlug = file.defaultAccountSlug
         warmUpKeychain()
     }
 
@@ -65,6 +78,9 @@ final class PanelViewModel: ObservableObject {
     /// antes de qualquer popover estar na tela — uma única leitura por
     /// conta, cacheada em `accountStatuses`. `refresh()` depois nunca relê o
     /// Keychain de uma conta que já está nesse cache, só de uma recém-criada.
+    /// Em seguida já dispara o carregamento do uso de todas as contas —
+    /// pelo tempo que o usuário clicar no ícone, os dados já devem estar
+    /// prontos, sem esperar o popover abrir para começar a buscar.
     private func warmUpKeychain() {
         Task.detached(priority: .utility) {
             let (file, _) = AccountsConfig.load()
@@ -75,6 +91,8 @@ final class PanelViewModel: ObservableObject {
                 for (slug, status) in statuses where self.accountStatuses[slug] == nil {
                     self.accountStatuses[slug] = status
                 }
+                self.loadUsageForAllAccounts()
+                self.loadAuthInfoForAllAccounts()
             }
         }
     }
@@ -284,10 +302,46 @@ final class PanelViewModel: ObservableObject {
     /// o app inteiro.
     func prepareForDisplay() {
         refresh()
-        if selectedAccountSlug == nil, let slug = accounts.first?.slug {
-            selectAccount(slug)
+        if selectedAccountSlug == nil {
+            selectedAccountSlug = accounts.first?.slug
         }
+        // Sempre recarrega todas as contas ao abrir o painel — antes só
+        // recarregava a aba selecionada, e só se o usuário trocasse de aba
+        // (selectAccount), nunca ao simplesmente reabrir o popover.
+        loadUsageForAllAccounts()
+        loadAuthInfoForAllAccounts()
         startPolling()
+    }
+
+    func loadUsageForAllAccounts() {
+        for account in accounts where !needsLogin(slug: account.slug) {
+            loadUsage(slug: account.slug)
+        }
+    }
+
+    func loadAuthInfoForAllAccounts() {
+        for account in accounts where !needsLogin(slug: account.slug) {
+            loadAuthInfo(slug: account.slug)
+        }
+    }
+
+    /// E-mail/plano não mudam sozinhos — carregado uma vez por conta e
+    /// cacheado, nunca repetido a cada poll de uso. `refreshStatus`/login
+    /// bem-sucedido invalidam o cache quando pode de fato ter mudado.
+    func loadAuthInfo(slug: String) {
+        guard authInfoStates[slug] == nil else { return }
+        guard let account = accounts.first(where: { $0.slug == slug }) else { return }
+        let configDir = account.configDir
+
+        Task {
+            let status = await Task.detached(priority: .utility) {
+                try? ClaudeAuthStatusClient.fetch(configDir: configDir)
+            }.value
+            guard let status else { return }
+            authInfoStates[slug] = AccountAuthInfo(
+                email: status.email, orgName: status.orgName, subscriptionType: status.subscriptionType
+            )
+        }
     }
 
     func startPolling() {
@@ -367,6 +421,7 @@ struct PanelView: View {
         if let slug = viewModel.selectedAccountSlug {
             viewModel.refreshStatus(slug: slug)
             viewModel.loadUsage(slug: slug)
+            viewModel.loadAuthInfo(slug: slug)
         }
     }
 
@@ -509,9 +564,48 @@ struct PanelView: View {
     }
 
     @ViewBuilder
+    private var accountIdentityHeader: some View {
+        let slug = viewModel.selectedAccountSlug ?? ""
+        if !viewModel.needsLogin(slug: slug) {
+            VStack(alignment: .leading, spacing: 2) {
+                if let info = viewModel.authInfoStates[slug] {
+                    HStack(alignment: .firstTextBaseline) {
+                        if let email = info.email {
+                            Text(email)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                        }
+                        Spacer()
+                        if let plan = info.subscriptionType {
+                            Text(plan.capitalized)
+                                .font(.caption2)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color.gray.opacity(0.2))
+                                .cornerRadius(4)
+                        }
+                    }
+                }
+                if let expiresAt = viewModel.accountStatuses[slug]?.refreshTokenExpiresAt {
+                    Text("Login expira \(expiresAt.formatted(.relative(presentation: .named)))")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            if viewModel.authInfoStates[slug] != nil || viewModel.accountStatuses[slug]?.refreshTokenExpiresAt != nil {
+                Divider()
+            }
+        }
+    }
+
+    @ViewBuilder
     private var usageContent: some View {
         let slug = viewModel.selectedAccountSlug ?? ""
         let state = viewModel.usageStates[slug]
+
+        accountIdentityHeader
 
         if viewModel.needsLogin(slug: slug) {
             VStack(alignment: .leading, spacing: 6) {

@@ -78,6 +78,17 @@ extensão oficial da Anthropic exige isso — ele é sempre local, sempre
 `.gitignore`, nunca a fonte de verdade. O risco de versionamento descrito
 abaixo continua válido para ele especificamente.
 
+## Atualização: por que isso não bastava sozinho (e o que faltava)
+
+Escrever `claudeCode.environmentVariables` em `.vscode/settings.json` nunca
+teve efeito real: esse setting é declarado com `"scope": "machine"` no
+`package.json` da extensão oficial, e settings desse scope só podem ser
+definidos em *user*/*remote* settings — o VS Code ignora silenciosamente
+qualquer valor em workspace settings. Ver `specs/03-patch-extensao-vscode`
+para a correção (`VSCodeExtensionPatcher`/`VSCodeExtensionWatcher`, que
+muda esse scope para `"window"` no `package.json` instalado). Com essa
+correção, o mecanismo descrito abaixo passa a funcionar de fato.
+
 ## Implementado e validado
 
 `VSCodeSettings.setConfigDir` (em `Sources/claude-switcher-cli/VSCodeSettings.swift`)

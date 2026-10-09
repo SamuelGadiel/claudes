@@ -2,7 +2,27 @@
 
 Resolve: P1 (fallback indevido de conta), P13 (incorporar a correção do leog)
 
-## Problema de origem
+## Atualização: um segundo problema, mais crítico, encontrado depois
+
+Além do problema de `process.env` descrito abaixo, existe uma causa raiz
+separada e mais fundamental: `claudeCode.environmentVariables` é declarado
+no `package.json` da extensão com `"scope": "machine"` — segundo a
+documentação oficial da Microsoft, esse scope só pode ser definido em
+*user*/*remote* settings, nunca em *workspace*. O VS Code ignora
+silenciosamente qualquer valor desse setting escrito em
+`.vscode/settings.json` de um projeto. **Essa era a causa real de por que a
+troca de conta nunca tinha efeito, mesmo com o patch do leog aplicado e a
+janela recarregada** — confirmado testando no VS Code real depois de trocar
+o scope para `"window"` no `package.json` instalado.
+
+Diferente do problema abaixo (que exige reescrever código JS minificado via
+regex), esse é editar um campo de um JSON estático — **já implementado**:
+`VSCodeExtensionPatcher` (`Sources/ClaudeSwitcherCore`) e
+`VSCodeExtensionWatcher` (`Sources/ClaudeSwitcherApp`, reaplica sozinho via
+`DispatchSource` quando a extensão atualiza). Ver kanban para o resumo
+completo da investigação.
+
+## Problema de origem (patch do leog — ainda não incorporado)
 
 A extensão `anthropic.claude-code` tem *storage helpers* internos que leem
 `process.env.CLAUDE_CONFIG_DIR` diretamente, enquanto

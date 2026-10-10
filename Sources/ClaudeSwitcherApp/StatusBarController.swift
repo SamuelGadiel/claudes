@@ -18,7 +18,7 @@ final class StatusBarController: NSObject {
     private let viewModel = PanelViewModel()
     private var cancellables: Set<AnyCancellable> = []
     private let launchAtLoginItem = NSMenuItem(
-        title: "Start at Login", action: #selector(toggleLaunchAtLogin), keyEquivalent: ""
+        title: String(localized: "Start at Login", bundle: .module), action: #selector(toggleLaunchAtLogin), keyEquivalent: ""
     )
 
     override init() {
@@ -95,15 +95,18 @@ final class StatusBarController: NSObject {
 
     private func setUpRightClickMenu() {
         let checkUpdates = NSMenuItem(
-            title: "Check for Updates", action: #selector(checkForUpdates), keyEquivalent: ""
+            title: String(localized: "Check for Updates", bundle: .module), action: #selector(checkForUpdates), keyEquivalent: ""
         )
         let reapplyVSCodePatch = NSMenuItem(
-            title: "Reapply Patch to Claude Extension", action: #selector(reapplyVSCodePatch), keyEquivalent: ""
+            title: String(localized: "Reapply Patch to Claude Extension", bundle: .module),
+            action: #selector(reapplyVSCodePatch), keyEquivalent: ""
         )
         let about = NSMenuItem(
-            title: "About Claude Switcher", action: #selector(showAbout), keyEquivalent: ""
+            title: String(localized: "About Claude Switcher", bundle: .module), action: #selector(showAbout), keyEquivalent: ""
         )
-        let quit = NSMenuItem(title: "Quit", action: #selector(quit), keyEquivalent: "q")
+        let quit = NSMenuItem(
+            title: String(localized: "Quit", bundle: .module), action: #selector(quit), keyEquivalent: "q"
+        )
 
         for item in [checkUpdates, reapplyVSCodePatch, launchAtLoginItem, about, quit] {
             item.target = self
@@ -126,10 +129,10 @@ final class StatusBarController: NSObject {
             try LaunchAtLoginManager.setEnabled(!LaunchAtLoginManager.isEnabled)
         } catch {
             let alert = NSAlert()
-            alert.messageText = "Could not change this"
+            alert.messageText = String(localized: "Could not change this", bundle: .module)
             alert.informativeText = "\(error)"
             alert.alertStyle = .warning
-            alert.addButton(withTitle: "OK")
+            alert.addButton(withTitle: String(localized: "OK", bundle: .module))
             NSApp.activate(ignoringOtherApps: true)
             alert.runModal()
         }
@@ -145,17 +148,22 @@ final class StatusBarController: NSObject {
             let summary = await ClaudePatchCoordinator.applyAll(log: false)
             let alert = NSAlert()
             if summary.entries.isEmpty {
-                alert.messageText = "No installation found"
-                alert.informativeText = "Could not find the Claude extension in either VS Code or VS Code Insiders."
+                alert.messageText = String(localized: "No installation found", bundle: .module)
+                alert.informativeText = String(
+                    localized: "Could not find the Claude extension in either VS Code or VS Code Insiders.",
+                    bundle: .module
+                )
                 alert.alertStyle = .informational
             } else {
-                alert.messageText = summary.hadRealError ? "Patch not fully applied" : "Patch verified"
+                alert.messageText = summary.hadRealError
+                    ? String(localized: "Patch not fully applied", bundle: .module)
+                    : String(localized: "Patch verified", bundle: .module)
                 alert.informativeText = summary.entries
                     .map { "\($0.root):\n\($0.scopeMessage)\n\($0.jsMessage)" }
                     .joined(separator: "\n\n")
                 alert.alertStyle = summary.hadRealError ? .warning : .informational
             }
-            alert.addButton(withTitle: "OK")
+            alert.addButton(withTitle: String(localized: "OK", bundle: .module))
             NSApp.activate(ignoringOtherApps: true)
             alert.runModal()
         }

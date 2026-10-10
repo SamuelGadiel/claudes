@@ -1,0 +1,52 @@
+/* Panel — section headers */
+"Open Projects (VS Code)" = "Projetos Abertos (VS Code)";
+"No projects open" = "Nenhum projeto aberto";
+"Terminal Sessions" = "Sessões de Terminal";
+"Accounts" = "Contas";
+"No accounts registered" = "Nenhuma conta cadastrada";
+"Session (5h)" = "Sessão (5h)";
+"Week" = "Semana";
+"Extra" = "Extra";
+
+/* Panel — add account form */
+"Add Account…" = "Adicionar Conta…";
+"Account name (e.g.: Client X)" = "Nome da conta (ex.: Cliente X)";
+"Slug (identifier, e.g.: client-x)" = "Slug (identificador, ex.: cliente-x)";
+"Create" = "Criar";
+
+/* Panel — login prompt */
+"This account hasn't logged in yet." = "Essa conta ainda não fez login.";
+"Log In" = "Fazer Login";
+
+/* Panel — misc actions */
+"Try Again" = "Tentar Novamente";
+"Switch" = "Trocar";
+"Remove" = "Remover";
+
+/* Shared buttons */
+"Cancel" = "Cancelar";
+"Close" = "Fechar";
+"Confirm" = "Confirmar";
+"OK" = "OK";
+
+/* Login session flow */
+"Starting login…" = "Iniciando login…";
+"Log in in the browser that opened" = "Faça login no navegador que abriu";
+"Then, paste the code the page showed here:" = "Depois, cole aqui o código que a página mostrou:";
+"Code" = "Código";
+"Verifying code…" = "Verificando código…";
+"That didn't work" = "Não deu certo";
+
+/* Right-click menu */
+"Check for Updates" = "Verificar Atualizações";
+"Reapply Patch to Claude Extension" = "Reaplicar Patch na Extensão Claude";
+"Start at Login" = "Iniciar ao Fazer Login";
+"About Claude Switcher" = "Sobre o Claude Switcher";
+"Quit" = "Sair";
+
+/* Right-click menu — alerts */
+"Could not change this" = "Não consegui alterar isso";
+"No installation found" = "Nenhuma instalação encontrada";
+"Could not find the Claude extension in either VS Code or VS Code Insiders." = "Não achei a extensão Claude nem no VS Code nem no VS Code Insiders.";
+"Patch not fully applied" = "Patch não aplicado por completo";
+"Patch verified" = "Patch verificado";

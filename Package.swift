@@ -3,6 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "claude-switcher",
+    defaultLocalization: "en",
     platforms: [.macOS(.v13)],
     targets: [
         .target(
@@ -17,7 +18,8 @@ let package = Package(
         .executableTarget(
             name: "ClaudeSwitcherApp",
             dependencies: ["ClaudeSwitcherCore"],
-            path: "Sources/ClaudeSwitcherApp"
+            path: "Sources/ClaudeSwitcherApp",
+            resources: [.process("Resources")]
         ),
     ]
 )

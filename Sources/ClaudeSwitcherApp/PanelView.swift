@@ -427,11 +427,11 @@ struct PanelView: View {
 
     private var mainContent: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Open Projects (VS Code)")
+            Text("Open Projects (VS Code)", bundle: .module)
                 .font(.headline)
 
             if viewModel.projects.isEmpty {
-                Text("No projects open")
+                Text("No projects open", bundle: .module)
                     .foregroundStyle(.secondary)
             } else {
                 ForEach(viewModel.projects) { project in
@@ -441,7 +441,7 @@ struct PanelView: View {
 
             if !viewModel.terminalSessions.isEmpty {
                 Divider()
-                Text("Terminal Sessions")
+                Text("Terminal Sessions", bundle: .module)
                     .font(.headline)
                 ForEach(viewModel.terminalSessions) { session in
                     terminalSessionRow(session)
@@ -459,15 +459,21 @@ struct PanelView: View {
             Divider()
 
             HStack {
-                Text("Accounts")
+                Text("Accounts", bundle: .module)
                     .font(.headline)
                 Spacer()
                 if !viewModel.isAddingAccount {
                     Menu {
-                        Button("Add Account…") { viewModel.startAddingAccount() }
+                        Button {
+                            viewModel.startAddingAccount()
+                        } label: {
+                            Text("Add Account…", bundle: .module)
+                        }
                         if let account = selectedAccount {
-                            Button("Remove \"\(account.name)\"", role: .destructive) {
+                            Button(role: .destructive) {
                                 confirmAndRemove(account)
+                            } label: {
+                                Text("Remove \"\(account.name)\"")
                             }
                         }
                     } label: {
@@ -483,7 +489,7 @@ struct PanelView: View {
             }
 
             if viewModel.accounts.isEmpty {
-                Text("No accounts registered")
+                Text("No accounts registered", bundle: .module)
                     .foregroundStyle(.secondary)
             } else {
                 Picker("", selection: accountSelectionBinding) {
@@ -511,7 +517,7 @@ struct PanelView: View {
             title: "Remove \"\(account.name)\"?",
             message: "This deletes the account's directory (\(account.configDir)) and the credential in the Keychain. "
                 + "It cannot be undone — if you want to use this account again, you'll need to log in from scratch.",
-            confirmTitle: "Remove"
+            confirmTitle: String(localized: "Remove", bundle: .module)
         )
         viewModel.keepPopoverOpen = false
         if confirmed {
@@ -530,15 +536,15 @@ struct PanelView: View {
     private var addAccountForm: some View {
         VStack(alignment: .leading, spacing: 6) {
             TextField(
-                "Account name (e.g.: Client X)",
-                text: Binding(get: { viewModel.newAccountName }, set: { viewModel.setAccountName($0) })
+                text: Binding(get: { viewModel.newAccountName }, set: { viewModel.setAccountName($0) }),
+                label: { Text("Account name (e.g.: Client X)", bundle: .module) }
             )
             .textFieldStyle(.roundedBorder)
             .onSubmit { viewModel.confirmAddAccount() }
 
             TextField(
-                "Slug (identifier, e.g.: client-x)",
-                text: Binding(get: { viewModel.newAccountSlug }, set: { viewModel.setAccountSlugManually($0) })
+                text: Binding(get: { viewModel.newAccountSlug }, set: { viewModel.setAccountSlugManually($0) }),
+                label: { Text("Slug (identifier, e.g.: client-x)", bundle: .module) }
             )
             .textFieldStyle(.roundedBorder)
             .font(.caption)
@@ -552,10 +558,18 @@ struct PanelView: View {
             }
 
             HStack {
-                Button("Cancel") { viewModel.cancelAddingAccount() }
+                Button {
+                    viewModel.cancelAddingAccount()
+                } label: {
+                    Text("Cancel", bundle: .module)
+                }
                 Spacer()
-                Button("Create") { viewModel.confirmAddAccount() }
-                    .disabled(viewModel.newAccountName.trimmingCharacters(in: .whitespaces).isEmpty)
+                Button {
+                    viewModel.confirmAddAccount()
+                } label: {
+                    Text("Create", bundle: .module)
+                }
+                .disabled(viewModel.newAccountName.trimmingCharacters(in: .whitespaces).isEmpty)
             }
         }
         .padding(8)
@@ -609,7 +623,7 @@ struct PanelView: View {
 
         if viewModel.needsLogin(slug: slug) {
             VStack(alignment: .leading, spacing: 6) {
-                Text("This account hasn't logged in yet.")
+                Text("This account hasn't logged in yet.", bundle: .module)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Button {
@@ -618,7 +632,7 @@ struct PanelView: View {
                         loginSession.start(configDir: account.configDir)
                     }
                 } label: {
-                    Text("Log In")
+                    Text("Log In", bundle: .module)
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
@@ -656,8 +670,10 @@ struct PanelView: View {
                     .font(.caption)
                     .foregroundStyle(.red)
                     .fixedSize(horizontal: false, vertical: true)
-                Button("Try Again") {
+                Button {
                     viewModel.loadUsage(slug: slug)
+                } label: {
+                    Text("Try Again", bundle: .module)
                 }
                 .font(.caption)
             }
@@ -713,12 +729,12 @@ struct PanelView: View {
     }
 
     @ViewBuilder
-    private func usageBar(title: String, window: UsageWindow?, resetStyle: ResetStyle) -> some View {
+    private func usageBar(title: LocalizedStringKey, window: UsageWindow?, resetStyle: ResetStyle) -> some View {
         if let window {
             let pct = max(0, min(100, window.utilization ?? 0))
             VStack(alignment: .leading, spacing: 2) {
                 HStack {
-                    Text(title).font(.caption)
+                    Text(title, bundle: .module).font(.caption)
                     Spacer()
                     Text("\(Int(pct))%").font(.caption).foregroundStyle(.secondary)
                 }
@@ -737,7 +753,7 @@ struct PanelView: View {
         let pct = max(0, min(100, extra.utilization ?? 0))
         VStack(alignment: .leading, spacing: 2) {
             HStack {
-                Text("Extra").font(.caption)
+                Text("Extra", bundle: .module).font(.caption)
                 Spacer()
                 Text("\(Int(pct))%").font(.caption).foregroundStyle(.secondary)
             }
@@ -760,12 +776,14 @@ struct PanelView: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
-            Menu("Switch") {
+            Menu {
                 ForEach(viewModel.accounts, id: \.slug) { account in
                     Button(account.name) {
                         viewModel.switchAccount(project: project, to: account)
                     }
                 }
+            } label: {
+                Text("Switch", bundle: .module)
             }
             .menuStyle(.borderlessButton)
             .fixedSize()
@@ -784,12 +802,14 @@ struct PanelView: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
-            Menu("Switch") {
+            Menu {
                 ForEach(viewModel.accounts, id: \.slug) { account in
                     Button(account.name) {
                         viewModel.switchTerminalSessionAccount(session: session, to: account)
                     }
                 }
+            } label: {
+                Text("Switch", bundle: .module)
             }
             .menuStyle(.borderlessButton)
             .fixedSize()

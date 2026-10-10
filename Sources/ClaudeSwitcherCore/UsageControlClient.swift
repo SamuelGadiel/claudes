@@ -32,7 +32,7 @@ public enum UsageControlError: Error, CustomStringConvertible {
 /// requiring any active session or prior interaction.
 public enum UsageControlClient {
     public static func fetch(configDir: String, timeout: TimeInterval = 10) throws -> UsageResponse {
-        let process = Process()
+        let process = DisclaimedProcess()
         process.executableURL = URL(fileURLWithPath: ClaudeExecutable.resolve())
         process.arguments = [
             "--input-format", "stream-json", "--output-format", "stream-json", "--verbose", "-p",
@@ -44,9 +44,9 @@ public enum UsageControlClient {
 
         let stdinPipe = Pipe()
         let stdoutPipe = Pipe()
-        process.standardInput = stdinPipe
-        process.standardOutput = stdoutPipe
-        process.standardError = Pipe()
+        process.standardInput = .pipe(stdinPipe)
+        process.standardOutput = .pipe(stdoutPipe)
+        process.standardError = .pipe(Pipe())
 
         let requestId = "cs-\(UUID().uuidString.prefix(8))"
         let semaphore = DispatchSemaphore(value: 0)

@@ -26,7 +26,7 @@ public enum ClaudeAuthStatusError: Error, CustomStringConvertible {
 /// (without blocking waiting for interactive login).
 public enum ClaudeAuthStatusClient {
     public static func fetch(configDir: String, timeout: TimeInterval = 10) throws -> ClaudeAuthStatus {
-        let process = Process()
+        let process = DisclaimedProcess()
         process.executableURL = URL(fileURLWithPath: ClaudeExecutable.resolve())
         process.arguments = ["auth", "status"]
 
@@ -34,10 +34,10 @@ public enum ClaudeAuthStatusClient {
         env["CLAUDE_CONFIG_DIR"] = (configDir as NSString).expandingTildeInPath
         process.environment = env
 
-        process.standardInput = FileHandle.nullDevice
+        process.standardInput = .handle(.nullDevice)
         let stdoutPipe = Pipe()
-        process.standardOutput = stdoutPipe
-        process.standardError = Pipe()
+        process.standardOutput = .pipe(stdoutPipe)
+        process.standardError = .pipe(Pipe())
 
         do {
             try process.run()

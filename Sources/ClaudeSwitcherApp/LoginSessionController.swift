@@ -19,7 +19,7 @@ final class LoginSessionController: ObservableObject {
     @Published var state: State = .idle
     @Published var codeInput = ""
 
-    private var process: Process?
+    private var process: DisclaimedProcess?
     private var stdinHandle: FileHandle?
     private var outputBuffer = ""
 
@@ -29,7 +29,7 @@ final class LoginSessionController: ObservableObject {
         codeInput = ""
         outputBuffer = ""
 
-        let process = Process()
+        let process = DisclaimedProcess()
         process.executableURL = URL(fileURLWithPath: ClaudeExecutable.resolve())
         process.arguments = ["auth", "login"]
 
@@ -39,9 +39,9 @@ final class LoginSessionController: ObservableObject {
 
         let stdinPipe = Pipe()
         let outputPipe = Pipe()
-        process.standardInput = stdinPipe
-        process.standardOutput = outputPipe
-        process.standardError = outputPipe
+        process.standardInput = .pipe(stdinPipe)
+        process.standardOutput = .pipe(outputPipe)
+        process.standardError = .pipe(outputPipe)
 
         stdinHandle = stdinPipe.fileHandleForWriting
         self.process = process

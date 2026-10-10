@@ -18,7 +18,7 @@ import Foundation
 public enum CredentialRefresher {
     @discardableResult
     public static func refreshInBackground(configDir: String, timeout: TimeInterval = 15) -> Bool {
-        let process = Process()
+        let process = DisclaimedProcess()
         process.executableURL = URL(fileURLWithPath: ShellPath.loginShell())
         process.arguments = ["-i", "-l", "-c", "command -v claude >/dev/null 2>&1 && claude mcp list"]
         process.currentDirectoryURL = URL(fileURLWithPath: "/tmp")
@@ -27,9 +27,9 @@ public enum CredentialRefresher {
         env["CLAUDE_CONFIG_DIR"] = (configDir as NSString).expandingTildeInPath
         process.environment = env
 
-        process.standardInput = FileHandle.nullDevice
-        process.standardOutput = FileHandle.nullDevice
-        process.standardError = FileHandle.nullDevice
+        process.standardInput = .handle(.nullDevice)
+        process.standardOutput = .handle(.nullDevice)
+        process.standardError = .handle(.nullDevice)
 
         let semaphore = DispatchSemaphore(value: 0)
         process.terminationHandler = { _ in semaphore.signal() }

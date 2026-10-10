@@ -15,7 +15,7 @@ public enum ClaudeGateway {
     /// calling `claude auth login` and then confirming the registration).
     @discardableResult
     public static func execute(configDir: String?, arguments: [String]) -> Int32 {
-        let process = Process()
+        let process = DisclaimedProcess()
         process.executableURL = URL(fileURLWithPath: ClaudeExecutable.resolve())
         process.arguments = arguments
 
@@ -27,11 +27,9 @@ public enum ClaudeGateway {
         }
         process.environment = env
 
-        // Inherits stdio directly (no Pipe) to preserve the TTY — essential
-        // for Claude Code's interactive mode to work normally.
-        process.standardInput = FileHandle.standardInput
-        process.standardOutput = FileHandle.standardOutput
-        process.standardError = FileHandle.standardError
+        // standardInput/Output/Error default to .inherit — stdio is passed
+        // through directly (no Pipe) to preserve the TTY, essential for
+        // Claude Code's interactive mode to work normally.
 
         do {
             try process.run()

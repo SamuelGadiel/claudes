@@ -10,7 +10,7 @@ enum ConfirmationAlert {
         alert.informativeText = message
         alert.alertStyle = .warning
         alert.addButton(withTitle: confirmTitle)
-        alert.addButton(withTitle: String(localized: "Cancel", bundle: .module))
+        alert.addButton(withTitle: String(localized: "Cancel", bundle: AppResources.bundle))
         NSApp.activate(ignoringOtherApps: true)
         return alert.runModal() == .alertFirstButtonReturn
     }

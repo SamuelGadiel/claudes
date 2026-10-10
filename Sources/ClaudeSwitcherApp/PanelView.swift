@@ -427,11 +427,11 @@ struct PanelView: View {
 
     private var mainContent: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Open Projects (VS Code)", bundle: .module)
+            Text("Open Projects (VS Code)", bundle: AppResources.bundle)
                 .font(.headline)
 
             if viewModel.projects.isEmpty {
-                Text("No projects open", bundle: .module)
+                Text("No projects open", bundle: AppResources.bundle)
                     .foregroundStyle(.secondary)
             } else {
                 ForEach(viewModel.projects) { project in
@@ -441,7 +441,7 @@ struct PanelView: View {
 
             if !viewModel.terminalSessions.isEmpty {
                 Divider()
-                Text("Terminal Sessions", bundle: .module)
+                Text("Terminal Sessions", bundle: AppResources.bundle)
                     .font(.headline)
                 ForEach(viewModel.terminalSessions) { session in
                     terminalSessionRow(session)
@@ -459,7 +459,7 @@ struct PanelView: View {
             Divider()
 
             HStack {
-                Text("Accounts", bundle: .module)
+                Text("Accounts", bundle: AppResources.bundle)
                     .font(.headline)
                 Spacer()
                 if !viewModel.isAddingAccount {
@@ -467,7 +467,7 @@ struct PanelView: View {
                         Button {
                             viewModel.startAddingAccount()
                         } label: {
-                            Text("Add Account…", bundle: .module)
+                            Text("Add Account…", bundle: AppResources.bundle)
                         }
                         if let account = selectedAccount {
                             Button(role: .destructive) {
@@ -489,7 +489,7 @@ struct PanelView: View {
             }
 
             if viewModel.accounts.isEmpty {
-                Text("No accounts registered", bundle: .module)
+                Text("No accounts registered", bundle: AppResources.bundle)
                     .foregroundStyle(.secondary)
             } else {
                 Picker("", selection: accountSelectionBinding) {
@@ -517,7 +517,7 @@ struct PanelView: View {
             title: "Remove \"\(account.name)\"?",
             message: "This deletes the account's directory (\(account.configDir)) and the credential in the Keychain. "
                 + "It cannot be undone — if you want to use this account again, you'll need to log in from scratch.",
-            confirmTitle: String(localized: "Remove", bundle: .module)
+            confirmTitle: String(localized: "Remove", bundle: AppResources.bundle)
         )
         viewModel.keepPopoverOpen = false
         if confirmed {
@@ -537,14 +537,14 @@ struct PanelView: View {
         VStack(alignment: .leading, spacing: 6) {
             TextField(
                 text: Binding(get: { viewModel.newAccountName }, set: { viewModel.setAccountName($0) }),
-                label: { Text("Account name (e.g.: Client X)", bundle: .module) }
+                label: { Text("Account name (e.g.: Client X)", bundle: AppResources.bundle) }
             )
             .textFieldStyle(.roundedBorder)
             .onSubmit { viewModel.confirmAddAccount() }
 
             TextField(
                 text: Binding(get: { viewModel.newAccountSlug }, set: { viewModel.setAccountSlugManually($0) }),
-                label: { Text("Slug (identifier, e.g.: client-x)", bundle: .module) }
+                label: { Text("Slug (identifier, e.g.: client-x)", bundle: AppResources.bundle) }
             )
             .textFieldStyle(.roundedBorder)
             .font(.caption)
@@ -561,13 +561,13 @@ struct PanelView: View {
                 Button {
                     viewModel.cancelAddingAccount()
                 } label: {
-                    Text("Cancel", bundle: .module)
+                    Text("Cancel", bundle: AppResources.bundle)
                 }
                 Spacer()
                 Button {
                     viewModel.confirmAddAccount()
                 } label: {
-                    Text("Create", bundle: .module)
+                    Text("Create", bundle: AppResources.bundle)
                 }
                 .disabled(viewModel.newAccountName.trimmingCharacters(in: .whitespaces).isEmpty)
             }
@@ -623,7 +623,7 @@ struct PanelView: View {
 
         if viewModel.needsLogin(slug: slug) {
             VStack(alignment: .leading, spacing: 6) {
-                Text("This account hasn't logged in yet.", bundle: .module)
+                Text("This account hasn't logged in yet.", bundle: AppResources.bundle)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Button {
@@ -632,7 +632,7 @@ struct PanelView: View {
                         loginSession.start(configDir: account.configDir)
                     }
                 } label: {
-                    Text("Log In", bundle: .module)
+                    Text("Log In", bundle: AppResources.bundle)
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
@@ -673,7 +673,7 @@ struct PanelView: View {
                 Button {
                     viewModel.loadUsage(slug: slug)
                 } label: {
-                    Text("Try Again", bundle: .module)
+                    Text("Try Again", bundle: AppResources.bundle)
                 }
                 .font(.caption)
             }
@@ -734,7 +734,7 @@ struct PanelView: View {
             let pct = max(0, min(100, window.utilization ?? 0))
             VStack(alignment: .leading, spacing: 2) {
                 HStack {
-                    Text(title, bundle: .module).font(.caption)
+                    Text(title, bundle: AppResources.bundle).font(.caption)
                     Spacer()
                     Text("\(Int(pct))%").font(.caption).foregroundStyle(.secondary)
                 }
@@ -753,7 +753,7 @@ struct PanelView: View {
         let pct = max(0, min(100, extra.utilization ?? 0))
         VStack(alignment: .leading, spacing: 2) {
             HStack {
-                Text("Extra", bundle: .module).font(.caption)
+                Text("Extra", bundle: AppResources.bundle).font(.caption)
                 Spacer()
                 Text("\(Int(pct))%").font(.caption).foregroundStyle(.secondary)
             }
@@ -783,7 +783,7 @@ struct PanelView: View {
                     }
                 }
             } label: {
-                Text("Switch", bundle: .module)
+                Text("Switch", bundle: AppResources.bundle)
             }
             .menuStyle(.borderlessButton)
             .fixedSize()
@@ -809,7 +809,7 @@ struct PanelView: View {
                     }
                 }
             } label: {
-                Text("Switch", bundle: .module)
+                Text("Switch", bundle: AppResources.bundle)
             }
             .menuStyle(.borderlessButton)
             .fixedSize()

@@ -16,31 +16,31 @@ struct LoginSessionView: View {
             case .starting:
                 HStack {
                     ProgressView().controlSize(.small)
-                    Text("Starting login…", bundle: .module)
+                    Text("Starting login…", bundle: AppResources.bundle)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
 
             case .waitingForCode:
-                Text("Log in in the browser that opened", bundle: .module)
+                Text("Log in in the browser that opened", bundle: AppResources.bundle)
                     .font(.headline)
-                Text("Then, paste the code the page showed here:", bundle: .module)
+                Text("Then, paste the code the page showed here:", bundle: AppResources.bundle)
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                TextField(text: $session.codeInput, label: { Text("Code", bundle: .module) })
+                TextField(text: $session.codeInput, label: { Text("Code", bundle: AppResources.bundle) })
                     .textFieldStyle(.roundedBorder)
                     .onSubmit { session.submitCode() }
                 HStack {
                     Button {
                         onDismiss()
                     } label: {
-                        Text("Cancel", bundle: .module)
+                        Text("Cancel", bundle: AppResources.bundle)
                     }
                     Spacer()
                     Button {
                         session.submitCode()
                     } label: {
-                        Text("Confirm", bundle: .module)
+                        Text("Confirm", bundle: AppResources.bundle)
                     }
                     .buttonStyle(.borderedProminent)
                     .disabled(session.codeInput.trimmingCharacters(in: .whitespaces).isEmpty)
@@ -49,7 +49,7 @@ struct LoginSessionView: View {
             case .submitting:
                 HStack {
                     ProgressView().controlSize(.small)
-                    Text("Verifying code…", bundle: .module)
+                    Text("Verifying code…", bundle: AppResources.bundle)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -60,7 +60,7 @@ struct LoginSessionView: View {
                 EmptyView()
 
             case .failure(let message):
-                Text("That didn't work", bundle: .module)
+                Text("That didn't work", bundle: AppResources.bundle)
                     .font(.headline)
                 Text(message)
                     .font(.caption)
@@ -69,7 +69,7 @@ struct LoginSessionView: View {
                 Button {
                     onDismiss()
                 } label: {
-                    Text("Close", bundle: .module)
+                    Text("Close", bundle: AppResources.bundle)
                 }
             }
         }

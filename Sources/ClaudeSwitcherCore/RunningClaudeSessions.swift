@@ -34,22 +34,6 @@ public enum RunningClaudeSessions {
         }
     }
 
-    /// True when a real editor-managed session (e.g. the VS Code extension's
-    /// chat panel) is already running `claude` for this configDir — used to
-    /// skip background checks (e.g. a usage-threshold poll) that would
-    /// otherwise add an extra `claude` process competing with a real
-    /// foreground session over Anthropic's single-use OAuth refresh token.
-    /// See UsageControlClient/ExpiryMonitor for the full reasoning.
-    public static func hasActiveEditorSession(configDir: String) -> Bool {
-        let expandedDefault = ("~/.claude" as NSString).expandingTildeInPath
-        let target = (configDir as NSString).expandingTildeInPath
-        return list().contains { session in
-            guard session.isManagedByEditor else { return false }
-            let sessionTarget = ((session.configDirFromEnv ?? expandedDefault) as NSString).expandingTildeInPath
-            return sessionTarget == target
-        }
-    }
-
     // MARK: - Enumerate PIDs by name (sysctl KERN_PROC_ALL)
 
     private static func pidsNamed(_ name: String) -> [Int32] {

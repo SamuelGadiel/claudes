@@ -83,11 +83,14 @@
 "If you can see this, notifications are working correctly." = "If you can see this, notifications are working correctly.";
 
 /* Usage threshold notifications */
-"the 5h session" = "the 5h session";
-"the weekly limit" = "the weekly limit";
-"the weekly Opus limit" = "the weekly Opus limit";
 "High usage: %@" = "High usage: %@";
-"Passed %d%% of %@." = "Passed %d%% of %@.";
+"Usage reset: %@" = "Usage reset: %@";
+"Passed %d%% of the 5h session." = "Passed %d%% of the 5h session.";
+"Passed %d%% of the weekly limit." = "Passed %d%% of the weekly limit.";
+"Passed %d%% of the weekly Opus limit." = "Passed %d%% of the weekly Opus limit.";
+"The 5h session is available again." = "The 5h session is available again.";
+"The weekly limit is available again." = "The weekly limit is available again.";
+"The weekly Opus limit is available again." = "The weekly Opus limit is available again.";
 "Quit" = "Quit";
 
 /* Right-click menu — alerts */

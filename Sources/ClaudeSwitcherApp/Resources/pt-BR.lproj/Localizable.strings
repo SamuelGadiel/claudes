@@ -83,11 +83,14 @@
 "If you can see this, notifications are working correctly." = "Se você está vendo isso, as notificações estão funcionando corretamente.";
 
 /* Usage threshold notifications */
-"the 5h session" = "a sessão de 5h";
-"the weekly limit" = "o limite semanal";
-"the weekly Opus limit" = "o limite semanal do Opus";
 "High usage: %@" = "Uso alto: %@";
-"Passed %d%% of %@." = "Passou de %d%% de %@.";
+"Usage reset: %@" = "Uso renovado: %@";
+"Passed %d%% of the 5h session." = "Passou de %d%% da sessão de 5h.";
+"Passed %d%% of the weekly limit." = "Passou de %d%% do limite semanal.";
+"Passed %d%% of the weekly Opus limit." = "Passou de %d%% do limite semanal do Opus.";
+"The 5h session is available again." = "A sessão de 5h está disponível novamente.";
+"The weekly limit is available again." = "O limite semanal está disponível novamente.";
+"The weekly Opus limit is available again." = "O limite semanal do Opus está disponível novamente.";
 "Quit" = "Sair";
 
 /* Right-click menu — alerts */

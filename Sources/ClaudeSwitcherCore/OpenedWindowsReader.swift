@@ -16,8 +16,7 @@ public enum OpenedWindowsReader {
     public static func read() -> [OpenedWindow] {
         guard let data = FileManager.default.contents(atPath: storagePath),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let windowsState = json["windowsState"] as? [String: Any],
-              let opened = windowsState["openedWindows"] as? [[String: Any]]
+              let windowsState = json["windowsState"] as? [String: Any]
         else {
             return []
         }
@@ -25,16 +24,26 @@ public enum OpenedWindowsReader {
         var seen = Set<String>()
         var result: [OpenedWindow] = []
 
-        for entry in opened {
-            guard let folderURI = entry["folder"] as? String,
-                  let url = URL(string: folderURI),
-                  url.isFileURL
-            else { continue }
-
+        func append(folderURI: String?) {
+            guard let folderURI, let url = URL(string: folderURI), url.isFileURL else { return }
             let path = url.path
-            guard !seen.contains(path) else { continue }
+            guard !seen.contains(path) else { return }
             seen.insert(path)
             result.append(OpenedWindow(path: path, name: (path as NSString).lastPathComponent))
+        }
+
+        // With a single window open, VS Code keeps it in `lastActiveWindow`
+        // and leaves `openedWindows` empty — it only starts listing windows
+        // there once there are 2+ open at once. Confirmed by reading a real
+        // storage.json with exactly one window open. Missing this is why a
+        // lone open project used to vanish from the panel.
+        if let lastActive = windowsState["lastActiveWindow"] as? [String: Any] {
+            append(folderURI: lastActive["folder"] as? String)
+        }
+
+        let opened = windowsState["openedWindows"] as? [[String: Any]] ?? []
+        for entry in opened {
+            append(folderURI: entry["folder"] as? String)
         }
 
         return result

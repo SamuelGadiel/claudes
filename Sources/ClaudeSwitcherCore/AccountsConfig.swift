@@ -28,7 +28,9 @@ public enum AccountsConfig {
                 defaultAccountSlug: "personal"
             )
             save(defaults)
-            return (defaults, ["Default config created at \(configFilePath) (use 'cs add'/'cs remove' to adjust it)"])
+            var messages = ["Default config created at \(configFilePath) (use 'cs add'/'cs remove' to adjust it)"]
+            messages += adoptSharedSessions(for: defaults)
+            return (defaults, messages)
         }
 
         guard let data = fm.contents(atPath: configFilePath) else {
@@ -36,7 +38,7 @@ public enum AccountsConfig {
         }
 
         if let file = try? JSONDecoder().decode(AccountsFile.self, from: data) {
-            return (file, [])
+            return (file, adoptSharedSessions(for: file))
         }
 
         // Legacy format: plain array without slug/default. Migrates preserving
@@ -47,13 +49,33 @@ public enum AccountsConfig {
             }
             let file = AccountsFile(accounts: migrated, defaultAccountSlug: migrated.first?.slug)
             save(file)
-            return (file, ["accounts.json migrated to the new format (with slug + default account)."])
+            var messages = ["accounts.json migrated to the new format (with slug + default account)."]
+            messages += adoptSharedSessions(for: file)
+            return (file, messages)
         }
 
         return (
             AccountsFile(accounts: [], defaultAccountSlug: nil),
             ["Could not parse \(configFilePath) — unknown format."]
         )
+    }
+
+    /// Transparently keeps every registered account on the shared chat
+    /// directory (spec 04) — not a user-facing command, not an opt-in: it's
+    /// how accounts work. Covers both a brand-new install and an
+    /// accounts.json that predates this app having the shared-sessions
+    /// model at all. The common case (already adopted) is a cheap symlink
+    /// check per account; only an account that still has real session data
+    /// on disk pays for an actual merge, and only once.
+    private static func adoptSharedSessions(for file: AccountsFile) -> [String] {
+        var messages: [String] = []
+        for account in file.accounts {
+            guard let result = try? SharedSessionsDirectory.adopt(configDir: account.configDir, accountSlug: account.slug),
+                  !result.alreadyAdopted
+            else { continue }
+            messages.append("'\(account.name)': adopted the shared chat directory (\(SharedSessionsDirectory.path)).")
+        }
+        return messages
     }
 
     public static func save(_ file: AccountsFile) {

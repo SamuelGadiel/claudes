@@ -13,7 +13,6 @@ func printUsage() {
       cs default <slug>                      sets the account used when the project has no .clauderc
       cs install-cli                         installs/updates the 'cs' link in a PATH directory
       cs status                              lists open VS Code projects and running terminal sessions, with each one's account
-      cs migrate-to-shared-sessions          adopts the shared chat directory for every registered account (spec 04)
 
     Legacy (spec 02, still works):
       cs set-account <project> <account>
@@ -338,40 +337,6 @@ func runSetAccount(projectPath: String, accountName: String) {
     }
 }
 
-/// Adopts the shared chat directory (spec 04) for every registered account —
-/// not just for this one-time migration, also useful for anyone updating
-/// from a version of this app predating the shared-sessions model, with
-/// accounts already registered before `projects/` became a symlink.
-func runMigrateToSharedSessions() {
-    let file = loadAccountsPrintingMessages()
-    guard !file.accounts.isEmpty else {
-        print("No registered accounts.")
-        return
-    }
-
-    for account in file.accounts {
-        do {
-            let result = try SharedSessionsDirectory.adopt(configDir: account.configDir, accountSlug: account.slug)
-            if result.alreadyAdopted {
-                print("'\(account.name)': already using the shared chat directory, nothing to do.")
-                continue
-            }
-            print("'\(account.name)': adopted \(SharedSessionsDirectory.path)")
-            if !result.projectsMovedCleanly.isEmpty {
-                print("  Moved without conflict: \(result.projectsMovedCleanly.joined(separator: ", "))")
-            }
-            if !result.identicalSkipped.isEmpty {
-                print("  Identical duplicates dropped: \(result.identicalSkipped.joined(separator: ", "))")
-            }
-            if !result.conflictsPreserved.isEmpty {
-                print("  Conflicts preserved (both kept, see .conflict-from-* suffix): \(result.conflictsPreserved.joined(separator: ", "))")
-            }
-        } catch {
-            print("'\(account.name)': error — \(error)")
-        }
-    }
-}
-
 // MARK: - Dispatch
 
 let allArgs = Array(CommandLine.arguments.dropFirst())
@@ -401,8 +366,6 @@ case "install-cli":
     runInstallCli()
 case "status":
     runStatus()
-case "migrate-to-shared-sessions":
-    runMigrateToSharedSessions()
 case "usage":
     runUsage(args: rest)
 case "set-account":

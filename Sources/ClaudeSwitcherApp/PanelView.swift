@@ -1,3 +1,4 @@
+import AppKit
 import ClaudeSwitcherCore
 import SwiftUI
 
@@ -18,7 +19,6 @@ struct TerminalSessionInfo: Identifiable {
 struct AccountUsageState {
     var isLoading = false
     var response: UsageResponse?
-    var lastUpdated: Date?
     var errorMessage: String?
 }
 
@@ -62,9 +62,12 @@ final class PanelViewModel: ObservableObject {
     @Published var keepPopoverOpen = false
 
     /// Periodically re-reads the usage of the selected tab while the panel is
-    /// open — cheap (local subprocess via UsageControlClient, never
-    /// network/HTTP), but there's no reason to do this with the popover closed.
-    private let pollInterval: TimeInterval = 30
+    /// open — local subprocess via UsageControlClient, never network/HTTP,
+    /// but not entirely free: each call is a `claude` process that could in
+    /// principle race a real foreground session over OAuth token renewal
+    /// (see refreshStatus/loadUsage). Short enough that the panel feels live
+    /// while open; there's no reason to do this with the popover closed.
+    private let pollInterval: TimeInterval = 5
     private var pollTimer: Timer?
 
     init() {
@@ -98,11 +101,24 @@ final class PanelViewModel: ObservableObject {
     }
 
     /// Re-reads the Keychain for a single account — used when we know its
-    /// status specifically may have changed (e.g. login just
-    /// finished), without re-querying all the others again.
+    /// status specifically may have changed (e.g. login just finished),
+    /// without re-querying all the others again. Also drops the cached
+    /// auth info (email/org/plan): `loadAuthInfo` only ever fetches it once
+    /// per account and otherwise never refreshes it, so a fresh login is the
+    /// one moment that cache actually needs invalidating.
     func refreshStatus(slug: String) {
         guard let account = accounts.first(where: { $0.slug == slug }) else { return }
         accountStatuses[slug] = AccountDiscovery.status(for: account)
+        authInfoStates[slug] = nil
+    }
+
+    private static let vscodeBundleIdentifiers: Set<String> = ["com.microsoft.VSCode", "com.microsoft.VSCodeInsiders"]
+
+    private static var isVSCodeRunning: Bool {
+        NSWorkspace.shared.runningApplications.contains {
+            guard let bundleIdentifier = $0.bundleIdentifier else { return false }
+            return vscodeBundleIdentifiers.contains(bundleIdentifier)
+        }
     }
 
     func refresh() {
@@ -110,10 +126,16 @@ final class PanelViewModel: ObservableObject {
         accounts = file.accounts
         defaultSlug = file.defaultAccountSlug
 
-        projects = OpenedWindowsReader.read().map { window in
-            let slug = ClauderFile.find(startingAt: window.path)?.account
-            return ProjectInfo(path: window.path, name: window.name, currentAccountSlug: slug)
-        }
+        // storage.json is state VS Code persists for session restore, not a
+        // live snapshot — it keeps whatever was last written even after VS
+        // Code fully quits. Without this check, the last project open before
+        // quitting would show up here forever as still "open".
+        projects = Self.isVSCodeRunning
+            ? OpenedWindowsReader.read().map { window in
+                let slug = ClauderFile.find(startingAt: window.path)?.account
+                return ProjectInfo(path: window.path, name: window.name, currentAccountSlug: slug)
+            }
+            : []
 
         terminalSessions = RunningClaudeSessions.list()
             .filter { !$0.isManagedByEditor }
@@ -135,15 +157,25 @@ final class PanelViewModel: ObservableObject {
         }
     }
 
-    /// true when there's no readable credential in the Keychain for this account —
-    /// a newly created and never logged-in account, or one fully revoked.
+    /// true for both "never logged in" and "expired" — anything that needs
+    /// the user to go through the login flow again. `accountStatuses[slug] ==
+    /// nil` (status not read yet) deliberately does NOT count as needing
+    /// login — only an actually-confirmed bad state does.
     func needsLogin(slug: String) -> Bool {
-        accountStatuses[slug]?.error != nil
+        guard let state = accountStatuses[slug]?.loginState else { return false }
+        return state != .loggedIn
+    }
+
+    /// Distinguishes "has a credential, but the refresh token expired" from
+    /// "never logged in" — same underlying `needsLogin` gate, different
+    /// message/icon in the UI.
+    func isExpiredLogin(slug: String) -> Bool {
+        accountStatuses[slug]?.loginState == .expired
     }
 
     func accountName(forSlug slug: String?) -> String {
         guard let slug, let account = accounts.first(where: { $0.slug == slug }) else {
-            return "no account set"
+            return String(localized: "No account set", bundle: AppResources.bundle)
         }
         return account.name
     }
@@ -282,12 +314,11 @@ final class PanelViewModel: ObservableObject {
 
             switch result {
             case .success(let response):
-                usageStates[slug] = AccountUsageState(isLoading: false, response: response, lastUpdated: Date())
+                usageStates[slug] = AccountUsageState(isLoading: false, response: response)
             case .failure(let error):
                 let previous = usageStates[slug]
                 usageStates[slug] = AccountUsageState(
-                    isLoading: false, response: previous?.response, lastUpdated: previous?.lastUpdated,
-                    errorMessage: "\(error)"
+                    isLoading: false, response: previous?.response, errorMessage: "\(error)"
                 )
             }
         }
@@ -473,7 +504,10 @@ struct PanelView: View {
                             Button(role: .destructive) {
                                 confirmAndRemove(account)
                             } label: {
-                                Text("Remove \"\(account.name)\"")
+                                Text(String(
+                                    format: NSLocalizedString("Remove \"%@\"", bundle: AppResources.bundle, comment: ""),
+                                    account.name
+                                ))
                             }
                         }
                     } label: {
@@ -494,7 +528,7 @@ struct PanelView: View {
             } else {
                 Picker("", selection: accountSelectionBinding) {
                     ForEach(viewModel.accounts, id: \.slug) { account in
-                        Text(account.name).tag(account.slug)
+                        accountTabLabel(for: account).tag(account.slug)
                     }
                 }
                 .pickerStyle(.segmented)
@@ -507,6 +541,16 @@ struct PanelView: View {
         .frame(width: 320)
     }
 
+    /// A segmented `Picker`'s items only accept `Text` (not arbitrary views),
+    /// so the warning indicator is embedded as an inline symbol via
+    /// `Text(Image(systemName:))` concatenation rather than an `HStack`.
+    private func accountTabLabel(for account: RegisteredAccount) -> Text {
+        guard viewModel.isExpiredLogin(slug: account.slug) else {
+            return Text(account.name)
+        }
+        return Text(Image(systemName: "exclamationmark.triangle.fill")) + Text(" " + account.name)
+    }
+
     private func confirmAndRemove(_ account: RegisteredAccount) {
         // NSAlert is a separate system window — opening it steals the popover's
         // focus, and with .transient that would close the panel on its own before
@@ -514,9 +558,19 @@ struct PanelView: View {
         // login). keepPopoverOpen holds the panel open until the decision is made.
         viewModel.keepPopoverOpen = true
         let confirmed = ConfirmationAlert.confirmDestructive(
-            title: "Remove \"\(account.name)\"?",
-            message: "This deletes the account's directory (\(account.configDir)) and the credential in the Keychain. "
-                + "It cannot be undone — if you want to use this account again, you'll need to log in from scratch.",
+            title: String(
+                format: NSLocalizedString("Remove \"%@\"?", bundle: AppResources.bundle, comment: ""),
+                account.name
+            ),
+            message: String(
+                format: NSLocalizedString(
+                    "This deletes the account's directory (%@) and the credential in the Keychain. "
+                        + "It cannot be undone — if you want to use this account again, you'll need to log in from scratch.",
+                    bundle: AppResources.bundle,
+                    comment: ""
+                ),
+                account.configDir
+            ),
             confirmTitle: String(localized: "Remove", bundle: AppResources.bundle)
         )
         viewModel.keepPopoverOpen = false
@@ -603,9 +657,12 @@ struct PanelView: View {
                     }
                 }
                 if let expiresAt = viewModel.accountStatuses[slug]?.refreshTokenExpiresAt {
-                    Text("Login expires \(expiresAt.formatted(.relative(presentation: .named).locale(Locale(identifier: "en_US"))))")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
+                    Text(String(
+                        format: NSLocalizedString("Login expires %@", bundle: AppResources.bundle, comment: ""),
+                        expiresAt.formatted(.relative(presentation: .named))
+                    ))
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
                 }
             }
             if viewModel.authInfoStates[slug] != nil || viewModel.accountStatuses[slug]?.refreshTokenExpiresAt != nil {
@@ -623,9 +680,15 @@ struct PanelView: View {
 
         if viewModel.needsLogin(slug: slug) {
             VStack(alignment: .leading, spacing: 6) {
-                Text("This account hasn't logged in yet.", bundle: AppResources.bundle)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                if viewModel.isExpiredLogin(slug: slug) {
+                    Text("Session expired — log in again to keep using this account.", bundle: AppResources.bundle)
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                } else {
+                    Text("This account hasn't logged in yet.", bundle: AppResources.bundle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
                 Button {
                     if let account = viewModel.accounts.first(where: { $0.slug == slug }) {
                         viewModel.keepPopoverOpen = true
@@ -655,14 +718,13 @@ struct PanelView: View {
             }
             .id(slug)
             if let error = state?.errorMessage {
-                Text("Not updated: \(error)")
+                Text(String(
+                    format: NSLocalizedString("Not updated: %@", bundle: AppResources.bundle, comment: ""),
+                    error
+                ))
                     .font(.caption2)
                     .foregroundStyle(.orange)
                     .fixedSize(horizontal: false, vertical: true)
-            } else if let lastUpdated = state?.lastUpdated {
-                Text("updated \(lastUpdated.formatted(.relative(presentation: .named).locale(Locale(identifier: "en_US"))))")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
             }
         } else if let error = state?.errorMessage {
             VStack(alignment: .leading, spacing: 4) {
@@ -713,19 +775,40 @@ struct PanelView: View {
             let hours = Int(seconds) / 3600
             let minutes = (Int(seconds) % 3600) / 60
             if hours > 0 {
-                return "Resets in \(hours)h \(minutes)min"
+                return String(
+                    format: NSLocalizedString("Resets in %dh %dmin", bundle: AppResources.bundle, comment: ""),
+                    hours, minutes
+                )
             }
-            return "Resets in \(minutes)min"
+            return String(
+                format: NSLocalizedString("Resets in %dmin", bundle: AppResources.bundle, comment: ""),
+                minutes
+            )
         case .weekday:
+            let weekday = Self.weekdayName(for: date)
             let formatter = DateFormatter()
-            formatter.locale = Locale(identifier: "en_US")
-            let weekday = formatter.weekdaySymbols[Calendar.current.component(.weekday, from: date) - 1]
+            formatter.locale = Locale.current
             formatter.dateFormat = "d"
             let day = formatter.string(from: date)
             formatter.dateFormat = "HH:mm"
             let time = formatter.string(from: date)
-            return "Resets \(weekday) (\(day)) at \(time)"
+            return String(
+                format: NSLocalizedString("Resets %@ (%@) at %@", bundle: AppResources.bundle, comment: ""),
+                weekday, day, time
+            )
         }
+    }
+
+    /// Own keys instead of `DateFormatter.weekdaySymbols` (which in
+    /// Portuguese returns the full form, "segunda-feira") — here we control
+    /// the exact wording per language ("segunda" instead).
+    private static func weekdayName(for date: Date) -> String {
+        let weekday = Calendar.current.component(.weekday, from: date)
+        let key = "weekday_short_\(weekday)"
+        // NSLocalizedString, not String(localized:) — the key here is built
+        // at runtime (not a string interpolation literal the compiler can
+        // turn into a format-based lookup), so it needs a plain table lookup.
+        return NSLocalizedString(key, bundle: AppResources.bundle, comment: "")
     }
 
     @ViewBuilder
@@ -759,9 +842,12 @@ struct PanelView: View {
             }
             UsageProgressBar(pct: pct, color: usageColor(for: pct))
             if let used = extra.usedCredits, let limit = extra.monthlyLimit {
-                Text("used \(used, specifier: "%.2f") of \(limit, specifier: "%.2f")")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+                Text(String(
+                    format: NSLocalizedString("used %.2f of %.2f", bundle: AppResources.bundle, comment: ""),
+                    used, limit
+                ))
+                .font(.caption2)
+                .foregroundStyle(.secondary)
             }
         }
     }

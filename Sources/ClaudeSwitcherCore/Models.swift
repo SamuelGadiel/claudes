@@ -42,6 +42,17 @@ public struct AccountsFile: Codable {
     }
 }
 
+public enum AccountLoginState {
+    /// No readable credential in the Keychain — a newly created account, or
+    /// one fully revoked.
+    case neverLoggedIn
+    /// A credential exists, but `refreshTokenExpiresAt` is in the past — the
+    /// access token can no longer be renewed automatically, needs a real
+    /// login again.
+    case expired
+    case loggedIn
+}
+
 public struct AccountStatus {
     public let name: String
     public let configDir: String
@@ -52,8 +63,13 @@ public struct AccountStatus {
     public let rateLimitTier: String?
     public let error: String?
 
-    public var isExpired: Bool {
-        guard let expiresAt else { return false }
-        return expiresAt < Date()
+    /// Never compares `expiresAt` (the access token) against now — that one
+    /// expires and silently renews itself all the time, that's normal. Only
+    /// `refreshTokenExpiresAt` reflects a session that actually needs a new
+    /// login. See specs/01-gerenciamento-contas-storage.
+    public var loginState: AccountLoginState {
+        if error != nil { return .neverLoggedIn }
+        if let refreshTokenExpiresAt, refreshTokenExpiresAt < Date() { return .expired }
+        return .loggedIn
     }
 }

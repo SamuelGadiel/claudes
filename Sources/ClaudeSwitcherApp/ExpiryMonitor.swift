@@ -73,16 +73,28 @@ final class ExpiryMonitor {
             if refreshExpiresAt < now {
                 notify(
                     key: expiredKey,
-                    title: "Session expired: \(account.name)",
-                    body: "Log in again: run 'cs \(account.slug) auth login' in the terminal."
+                    title: String(
+                        format: NSLocalizedString("Session expired: %@", bundle: AppResources.bundle, comment: ""),
+                        account.name
+                    ),
+                    body: String(
+                        localized: "Open Claude Switcher and log in again to keep using this account.",
+                        bundle: AppResources.bundle
+                    )
                 )
             } else {
                 notifiedKeys.remove(expiredKey)
                 if refreshExpiresAt.timeIntervalSince(now) < warningWindow {
                     notify(
                         key: expiringKey,
-                        title: "Session expiring soon: \(account.name)",
-                        body: "Expires \(refreshExpiresAt.formatted(Date.FormatStyle(date: .abbreviated, time: .shortened, locale: Locale(identifier: "en_US"))))."
+                        title: String(
+                            format: NSLocalizedString("Session expiring soon: %@", bundle: AppResources.bundle, comment: ""),
+                            account.name
+                        ),
+                        body: String(
+                            format: NSLocalizedString("Expires %@.", bundle: AppResources.bundle, comment: ""),
+                            refreshExpiresAt.formatted(Date.FormatStyle(date: .abbreviated, time: .shortened))
+                        )
                     )
                 } else {
                     notifiedKeys.remove(expiringKey)

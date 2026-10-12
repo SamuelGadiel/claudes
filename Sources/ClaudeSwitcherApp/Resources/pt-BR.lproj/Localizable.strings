@@ -32,6 +32,10 @@
 "Remove \"%@\"" = "Remover \"%@\"";
 "Remove \"%@\"?" = "Remover \"%@\"?";
 "This deletes the account's directory (%@) and the credential in the Keychain. It cannot be undone — if you want to use this account again, you'll need to log in from scratch." = "Isso apaga o diretório da conta (%@) e a credencial no Keychain. Não pode ser desfeito — se quiser usar essa conta de novo, você vai precisar fazer login do zero.";
+"Clear chat history for \"%@\"?" = "Limpar histórico de chats de \"%@\"?";
+"This deletes every saved conversation for this project — shared by every account, since chats belong to the project, not to any single account. It cannot be undone." = "Isso apaga todas as conversas salvas deste projeto — compartilhadas por todas as contas, já que os chats pertencem ao projeto, não a uma conta específica. Não pode ser desfeito.";
+"Clear History" = "Limpar Histórico";
+"Clear Chat History…" = "Limpar Histórico de Chats…";
 "Not updated: %@" = "Não atualizado: %@";
 "used %.2f of %.2f" = "usado %.2f de %.2f";
 "No account set" = "Nenhuma conta definida";

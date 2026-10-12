@@ -32,6 +32,10 @@
 "Remove \"%@\"" = "Remove \"%@\"";
 "Remove \"%@\"?" = "Remove \"%@\"?";
 "This deletes the account's directory (%@) and the credential in the Keychain. It cannot be undone — if you want to use this account again, you'll need to log in from scratch." = "This deletes the account's directory (%@) and the credential in the Keychain. It cannot be undone — if you want to use this account again, you'll need to log in from scratch.";
+"Clear chat history for \"%@\"?" = "Clear chat history for \"%@\"?";
+"This deletes every saved conversation for this project — shared by every account, since chats belong to the project, not to any single account. It cannot be undone." = "This deletes every saved conversation for this project — shared by every account, since chats belong to the project, not to any single account. It cannot be undone.";
+"Clear History" = "Clear History";
+"Clear Chat History…" = "Clear Chat History…";
 "Not updated: %@" = "Not updated: %@";
 "used %.2f of %.2f" = "used %.2f of %.2f";
 "No account set" = "No account set";

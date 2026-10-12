@@ -181,8 +181,10 @@ final class PanelViewModel: ObservableObject {
     }
 
     /// Switches the account of a project (.clauderc + .vscode/settings.json —
-    /// same flow as `cs set`). Session sync (spec 04) is still
-    /// not wired in here — see kanban.
+    /// same flow as `cs set`). No session sync needed anymore: every
+    /// account's `projects/` is the same shared directory (see
+    /// SharedSessionsDirectory), so chat history is already there no matter
+    /// which account ends up active.
     func switchAccount(project: ProjectInfo, to newAccount: RegisteredAccount) {
         do {
             try ClauderFile.write(accountSlug: newAccount.slug, inDir: project.path)
@@ -195,6 +197,18 @@ final class PanelViewModel: ObservableObject {
             statusMessage = "Error switching \(project.name): \(error)"
         }
         refresh()
+    }
+
+    /// Deletes every saved chat for this project from the shared sessions
+    /// directory — affects every account, since chats aren't account-scoped
+    /// anymore. Irreversible; the view already confirmed with the user.
+    func clearChatHistory(project: ProjectInfo) {
+        do {
+            try SharedSessionsDirectory.clearHistory(forProjectPath: project.path)
+            statusMessage = "Chat history for \(project.name) cleared"
+        } catch {
+            statusMessage = "Error clearing history for \(project.name): \(error)"
+        }
     }
 
     /// It's not possible to change the environment of an already-running process —
@@ -873,6 +887,40 @@ struct PanelView: View {
             }
             .menuStyle(.borderlessButton)
             .fixedSize()
+
+            Menu {
+                Button(role: .destructive) {
+                    confirmAndClearHistory(project)
+                } label: {
+                    Text("Clear Chat History…", bundle: AppResources.bundle)
+                }
+            } label: {
+                Image(systemName: "ellipsis.circle")
+            }
+            .menuStyle(.borderlessButton)
+            .fixedSize()
+        }
+    }
+
+    private func confirmAndClearHistory(_ project: ProjectInfo) {
+        // Same reasoning as confirmAndRemove: NSAlert steals the popover's
+        // focus, keepPopoverOpen holds the panel open until the decision is made.
+        viewModel.keepPopoverOpen = true
+        let confirmed = ConfirmationAlert.confirmDestructive(
+            title: String(
+                format: NSLocalizedString("Clear chat history for \"%@\"?", bundle: AppResources.bundle, comment: ""),
+                project.name
+            ),
+            message: NSLocalizedString(
+                "This deletes every saved conversation for this project — shared by every account, "
+                    + "since chats belong to the project, not to any single account. It cannot be undone.",
+                bundle: AppResources.bundle, comment: ""
+            ),
+            confirmTitle: String(localized: "Clear History", bundle: AppResources.bundle)
+        )
+        viewModel.keepPopoverOpen = false
+        if confirmed {
+            viewModel.clearChatHistory(project: project)
         }
     }
 

@@ -13,10 +13,10 @@ func printUsage() {
       cs default <slug>                      sets the account used when the project has no .clauderc
       cs install-cli                         installs/updates the 'cs' link in a PATH directory
       cs status                              lists open VS Code projects and running terminal sessions, with each one's account
+      cs migrate-to-shared-sessions          adopts the shared chat directory for every registered account (spec 04)
 
-    Legacy (specs 02/04, still work):
+    Legacy (spec 02, still works):
       cs set-account <project> <account>
-      cs sync-sessions <project> <source> <destination>
     """)
 }
 
@@ -338,34 +338,37 @@ func runSetAccount(projectPath: String, accountName: String) {
     }
 }
 
-func runSyncSessions(projectPath: String, fromName: String, toName: String) {
+/// Adopts the shared chat directory (spec 04) for every registered account —
+/// not just for this one-time migration, also useful for anyone updating
+/// from a version of this app predating the shared-sessions model, with
+/// accounts already registered before `projects/` became a symlink.
+func runMigrateToSharedSessions() {
     let file = loadAccountsPrintingMessages()
-    guard let fromAccount = AccountsConfig.find(identifier: fromName, in: file) else {
-        print("Account '\(fromName)' not found. Registered accounts: \(file.accounts.map(\.name).joined(separator: ", "))")
-        exit(1)
-    }
-    guard let toAccount = AccountsConfig.find(identifier: toName, in: file) else {
-        print("Account '\(toName)' not found. Registered accounts: \(file.accounts.map(\.name).joined(separator: ", "))")
-        exit(1)
+    guard !file.accounts.isEmpty else {
+        print("No registered accounts.")
+        return
     }
 
-    do {
-        let result = try SessionSync.sync(projectPath: projectPath, from: fromAccount, to: toAccount)
-
-        if result.copied.isEmpty {
-            print("Nothing to sync — no new session in '\(fromAccount.name)' (\(result.sourceDir)).")
-        } else {
-            print("Copied \(result.copied.count) session(s) from '\(fromAccount.name)' to '\(toAccount.name)':")
-            for file in result.copied { print("  - \(file)") }
+    for account in file.accounts {
+        do {
+            let result = try SharedSessionsDirectory.adopt(configDir: account.configDir, accountSlug: account.slug)
+            if result.alreadyAdopted {
+                print("'\(account.name)': already using the shared chat directory, nothing to do.")
+                continue
+            }
+            print("'\(account.name)': adopted \(SharedSessionsDirectory.path)")
+            if !result.projectsMovedCleanly.isEmpty {
+                print("  Moved without conflict: \(result.projectsMovedCleanly.joined(separator: ", "))")
+            }
+            if !result.identicalSkipped.isEmpty {
+                print("  Identical duplicates dropped: \(result.identicalSkipped.joined(separator: ", "))")
+            }
+            if !result.conflictsPreserved.isEmpty {
+                print("  Conflicts preserved (both kept, see .conflict-from-* suffix): \(result.conflictsPreserved.joined(separator: ", "))")
+            }
+        } catch {
+            print("'\(account.name)': error — \(error)")
         }
-
-        if !result.skippedExisting.isEmpty {
-            print("\nAlready existed in '\(toAccount.name)' and were NOT overwritten:")
-            for file in result.skippedExisting { print("  - \(file)") }
-        }
-    } catch {
-        print("Error: \(error)")
-        exit(1)
     }
 }
 
@@ -398,14 +401,13 @@ case "install-cli":
     runInstallCli()
 case "status":
     runStatus()
+case "migrate-to-shared-sessions":
+    runMigrateToSharedSessions()
 case "usage":
     runUsage(args: rest)
 case "set-account":
     guard rest.count == 2 else { printUsage(); exit(1) }
     runSetAccount(projectPath: rest[0], accountName: rest[1])
-case "sync-sessions":
-    guard rest.count == 3 else { printUsage(); exit(1) }
-    runSyncSessions(projectPath: rest[0], fromName: rest[1], toName: rest[2])
 case "help", "-h", "--help":
     printUsage()
 case "-v", "--version":

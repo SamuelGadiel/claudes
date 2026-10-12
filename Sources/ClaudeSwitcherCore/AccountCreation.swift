@@ -56,6 +56,15 @@ extension AccountsConfig {
             throw AccountCreationError.directoryCreationFailed("\(error)")
         }
 
+        // Every account's `projects/` is a symlink into SharedSessionsDirectory
+        // from the moment it's created — there's no per-account session
+        // storage model to migrate away from later. Harmless no-op for a
+        // brand-new, never-used directory (nothing to merge, just creates the
+        // symlink); only does real merge work when adopting a directory that
+        // already has session history (e.g. importing an account created
+        // before this app existed).
+        try SharedSessionsDirectory.adopt(configDir: expandedConfigDir, accountSlug: slug)
+
         let account = RegisteredAccount(name: name, slug: slug, configDir: expandedConfigDir)
         file.accounts.append(account)
         if markDefault || file.accounts.count == 1 {

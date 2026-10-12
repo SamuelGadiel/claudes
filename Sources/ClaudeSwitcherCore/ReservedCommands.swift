@@ -4,5 +4,8 @@ public enum ReservedCommands {
     public static let names: Set<String> = [
         "list", "add", "remove", "set", "default", "install-cli", "status", "usage", "help", "-h", "--help",
         "-v", "--version",
+        // Not a CLI command — reserved because it would collide with
+        // SharedSessionsDirectory's own folder name (~/.claude-shared-chats).
+        SharedSessionsDirectory.reservedSlug,
     ]
 }

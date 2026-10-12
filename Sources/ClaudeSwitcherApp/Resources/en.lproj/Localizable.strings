@@ -78,6 +78,9 @@
 "Reapply Patch to Claude Extension" = "Reapply Patch to Claude Extension";
 "Start at Login" = "Start at Login";
 "About Claude Switcher" = "About Claude Switcher";
+"Test Expiry Notification" = "Test Expiry Notification";
+"Test notification" = "Test notification";
+"If you can see this, notifications are working correctly." = "If you can see this, notifications are working correctly.";
 "Quit" = "Quit";
 
 /* Right-click menu — alerts */

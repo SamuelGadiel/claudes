@@ -103,6 +103,26 @@ final class ExpiryMonitor {
         }
     }
 
+    /// Manual trigger for testing the notification pipeline end-to-end
+    /// without waiting for a real account to expire — bypasses the normal
+    /// dedup (notifiedKeys) so it can be fired repeatedly on demand. Exposed
+    /// via the right-click menu's "Test Expiry Notification" item.
+    func sendTestNotification() {
+        requestAuthorization { [weak self] in
+            guard self?.notificationsAvailable == true else { return }
+            let content = UNMutableNotificationContent()
+            content.title = String(localized: "Test notification", bundle: AppResources.bundle)
+            content.body = String(
+                localized: "If you can see this, notifications are working correctly.",
+                bundle: AppResources.bundle
+            )
+            content.sound = .default
+            UNUserNotificationCenter.current().add(
+                UNNotificationRequest(identifier: "test-\(UUID().uuidString)", content: content, trigger: nil)
+            )
+        }
+    }
+
     private func notify(key: String, title: String, body: String) {
         guard notificationsAvailable else { return }
         guard !notifiedKeys.contains(key) else { return }

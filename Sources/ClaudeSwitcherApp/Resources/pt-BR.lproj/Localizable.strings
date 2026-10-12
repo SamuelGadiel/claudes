@@ -78,6 +78,9 @@
 "Reapply Patch to Claude Extension" = "Reaplicar Patch na Extensão Claude";
 "Start at Login" = "Iniciar ao Fazer Login";
 "About Claude Switcher" = "Sobre o Claude Switcher";
+"Test Expiry Notification" = "Testar Notificação de Expiração";
+"Test notification" = "Notificação de teste";
+"If you can see this, notifications are working correctly." = "Se você está vendo isso, as notificações estão funcionando corretamente.";
 "Quit" = "Sair";
 
 /* Right-click menu — alerts */

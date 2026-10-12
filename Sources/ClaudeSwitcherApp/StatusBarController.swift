@@ -20,6 +20,11 @@ final class StatusBarController: NSObject {
     private let launchAtLoginItem = NSMenuItem(
         title: String(localized: "Start at Login", bundle: AppResources.bundle), action: #selector(toggleLaunchAtLogin), keyEquivalent: ""
     )
+    /// Kept alive here, not a local variable in sendTestNotification() — its
+    /// own requestAuthorization call is asynchronous and holds `self` only
+    /// weakly, so a local instance would be deallocated before the
+    /// completion handler ever ran, silently dropping the test notification.
+    private var testNotificationMonitor: ExpiryMonitor?
 
     override init() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
@@ -104,11 +109,19 @@ final class StatusBarController: NSObject {
         let about = NSMenuItem(
             title: String(localized: "About Claude Switcher", bundle: AppResources.bundle), action: #selector(showAbout), keyEquivalent: ""
         )
+        // Temporary debug item — lets the user validate the notification
+        // pipeline (permission + delivery) on demand, without waiting for a
+        // real account's refresh token to expire. Remove once P9
+        // (specs/05-app-status-bar) is confirmed working end to end.
+        let testNotification = NSMenuItem(
+            title: String(localized: "Test Expiry Notification", bundle: AppResources.bundle),
+            action: #selector(sendTestNotification), keyEquivalent: ""
+        )
         let quit = NSMenuItem(
             title: String(localized: "Quit", bundle: AppResources.bundle), action: #selector(quit), keyEquivalent: "q"
         )
 
-        for item in [checkUpdates, reapplyVSCodePatch, launchAtLoginItem, about, quit] {
+        for item in [checkUpdates, reapplyVSCodePatch, launchAtLoginItem, about, testNotification, quit] {
             item.target = self
         }
 
@@ -116,6 +129,8 @@ final class StatusBarController: NSObject {
         rightClickMenu.addItem(reapplyVSCodePatch)
         rightClickMenu.addItem(launchAtLoginItem)
         rightClickMenu.addItem(about)
+        rightClickMenu.addItem(.separator())
+        rightClickMenu.addItem(testNotification)
         rightClickMenu.addItem(.separator())
         rightClickMenu.addItem(quit)
     }
@@ -230,6 +245,16 @@ final class StatusBarController: NSObject {
 
     @objc private func showAbout() {
         NSApp.orderFrontStandardAboutPanel(nil)
+    }
+
+    @objc private func sendTestNotification() {
+        // A separate instance from the app's real ExpiryMonitor (owned by
+        // AppDelegate) is fine — this doesn't touch its timer or
+        // notifiedKeys state — but it has to be this property, not a local,
+        // see testNotificationMonitor's declaration.
+        let monitor = ExpiryMonitor()
+        testNotificationMonitor = monitor
+        monitor.sendTestNotification()
     }
 
     @objc private func quit() {

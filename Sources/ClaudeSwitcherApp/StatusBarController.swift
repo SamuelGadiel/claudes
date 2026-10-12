@@ -159,7 +159,7 @@ final class StatusBarController: NSObject {
                     ? String(localized: "Patch not fully applied", bundle: AppResources.bundle)
                     : String(localized: "Patch verified", bundle: AppResources.bundle)
                 alert.informativeText = summary.entries
-                    .map { "\($0.root):\n\($0.scopeMessage)\n\($0.jsMessage)" }
+                    .map(Self.localizedDescription)
                     .joined(separator: "\n\n")
                 alert.alertStyle = summary.hadRealError ? .warning : .informational
             }
@@ -167,6 +167,65 @@ final class StatusBarController: NSObject {
             NSApp.activate(ignoringOtherApps: true)
             alert.runModal()
         }
+    }
+
+    /// Builds the localized, human-readable block shown for one editor root
+    /// in the "Reapply patch" result alert — explicitly names the Claude
+    /// Code extension (not the editor) as what was patched. One version per
+    /// line, a blank line before the status lines.
+    private static func localizedDescription(for entry: ClaudePatchCoordinator.Entry) -> String {
+        var lines = [entry.root.description]
+        if let editorVersion = entry.editorVersion {
+            lines.append(String(
+                format: NSLocalizedString("Editor version: %@", bundle: AppResources.bundle, comment: ""),
+                editorVersion
+            ))
+        }
+        if let extensionVersion = entry.scope.extensionVersion {
+            lines.append(String(
+                format: NSLocalizedString("Extension version: %@", bundle: AppResources.bundle, comment: ""),
+                extensionVersion
+            ))
+        }
+
+        let scopeText: String
+        switch entry.scope {
+        case .alreadyApplied: scopeText = String(localized: "already applied", bundle: AppResources.bundle)
+        case .appliedNow: scopeText = String(localized: "applied now", bundle: AppResources.bundle)
+        case .skipped(let reason):
+            scopeText = String(
+                format: NSLocalizedString("skipped (%@)", bundle: AppResources.bundle, comment: ""), reason
+            )
+        case .error(let detail):
+            scopeText = String(
+                format: NSLocalizedString("error — %@", bundle: AppResources.bundle, comment: ""), detail
+            )
+        }
+        let scopeLabel = String(localized: "Scope setting:", bundle: AppResources.bundle)
+
+        let jsText: String
+        switch entry.js {
+        case .alreadyPatched: jsText = String(localized: "already patched", bundle: AppResources.bundle)
+        case .patchedNow(let changes):
+            jsText = String(
+                format: NSLocalizedString("patched now (%@)", bundle: AppResources.bundle, comment: ""),
+                changes.joined(separator: ", ")
+            )
+        case .skipped(let reason):
+            jsText = String(
+                format: NSLocalizedString("js skipped (%@)", bundle: AppResources.bundle, comment: ""), reason
+            )
+        case .error(let detail):
+            jsText = String(
+                format: NSLocalizedString("js error — %@", bundle: AppResources.bundle, comment: ""), detail
+            )
+        }
+
+        lines.append("")
+        lines.append("\(scopeLabel) \(scopeText)")
+        lines.append("extension.js: \(jsText)")
+
+        return lines.joined(separator: "\n")
     }
 
     @objc private func showAbout() {

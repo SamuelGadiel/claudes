@@ -22,6 +22,32 @@ public enum VSCodeEditorRoot: String, CaseIterable, CustomStringConvertible {
         case .insiders: return "VS Code Insiders"
         }
     }
+
+    private var appBundleName: String {
+        switch self {
+        case .stable: return "Visual Studio Code.app"
+        case .insiders: return "Visual Studio Code - Insiders.app"
+        }
+    }
+
+    /// Reads the editor's own version (distinct from the extension's) directly
+    /// from its app bundle's `product.json` — no subprocess spawn (e.g. `code
+    /// --version`) needed for something this static. Checks both the common
+    /// system-wide and per-user install locations; nil if the editor itself
+    /// isn't found there (the extension can still be located independently,
+    /// since it lives under `~/.vscode[-insiders]`, not under the app bundle).
+    public var installedEditorVersion: String? {
+        let home = NSHomeDirectory()
+        for root in ["/Applications", "\(home)/Applications"] {
+            let productJSONPath = "\(root)/\(appBundleName)/Contents/Resources/app/product.json"
+            guard let data = FileManager.default.contents(atPath: productJSONPath),
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let version = json["version"] as? String
+            else { continue }
+            return version
+        }
+        return nil
+    }
 }
 
 public enum VSCodeExtensionPatchError: Error, CustomStringConvertible {

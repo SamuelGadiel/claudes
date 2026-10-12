@@ -16,12 +16,34 @@
 
 /* Panel — login prompt */
 "This account hasn't logged in yet." = "Essa conta ainda não fez login.";
+"Session expired — log in again to keep using this account." = "Sessão expirada — faça login novamente para continuar usando esta conta.";
 "Log In" = "Fazer Login";
 
 /* Panel — misc actions */
 "Try Again" = "Tentar Novamente";
 "Switch" = "Trocar";
 "Remove" = "Remover";
+
+/* Panel — account identity & usage, dynamic strings */
+"Login expires %@" = "Login expira %@";
+"Resets in %dh %dmin" = "Reinicia em %dh %dmin";
+"Resets in %dmin" = "Reinicia em %dmin";
+"Resets %@ (%@) at %@" = "Reinicia %@ (%@) às %@";
+"Remove \"%@\"" = "Remover \"%@\"";
+"Remove \"%@\"?" = "Remover \"%@\"?";
+"This deletes the account's directory (%@) and the credential in the Keychain. It cannot be undone — if you want to use this account again, you'll need to log in from scratch." = "Isso apaga o diretório da conta (%@) e a credencial no Keychain. Não pode ser desfeito — se quiser usar essa conta de novo, você vai precisar fazer login do zero.";
+"Not updated: %@" = "Não atualizado: %@";
+"used %.2f of %.2f" = "usado %.2f de %.2f";
+"No account set" = "Nenhuma conta definida";
+
+/* Panel — weekday names used in the weekly reset label, Sunday(1)..Saturday(7) */
+"weekday_short_1" = "domingo";
+"weekday_short_2" = "segunda";
+"weekday_short_3" = "terça";
+"weekday_short_4" = "quarta";
+"weekday_short_5" = "quinta";
+"weekday_short_6" = "sexta";
+"weekday_short_7" = "sábado";
 
 /* Shared buttons */
 "Cancel" = "Cancelar";
@@ -37,6 +59,12 @@
 "Verifying code…" = "Verificando código…";
 "That didn't work" = "Não deu certo";
 
+/* Expiry notifications */
+"Session expired: %@" = "Sessão expirada: %@";
+"Open Claude Switcher and log in again to keep using this account." = "Abra o Claude Switcher e faça login novamente para continuar usando esta conta.";
+"Session expiring soon: %@" = "Sessão expirando em breve: %@";
+"Expires %@." = "Expira %@.";
+
 /* Right-click menu */
 "Check for Updates" = "Verificar Atualizações";
 "Reapply Patch to Claude Extension" = "Reaplicar Patch na Extensão Claude";
@@ -50,3 +78,16 @@
 "Could not find the Claude extension in either VS Code or VS Code Insiders." = "Não achei a extensão Claude nem no VS Code nem no VS Code Insiders.";
 "Patch not fully applied" = "Patch não aplicado por completo";
 "Patch verified" = "Patch verificado";
+
+/* Right-click menu — patch result detail, per editor root */
+"Editor version: %@" = "Versão do editor: %@";
+"Extension version: %@" = "Versão da extensão: %@";
+"Scope setting:" = "Configuração de escopo:";
+"already applied" = "já aplicada";
+"applied now" = "aplicada agora";
+"skipped (%@)" = "ignorada (%@)";
+"error — %@" = "erro — %@";
+"already patched" = "já aplicado";
+"patched now (%@)" = "aplicado agora (%@)";
+"js skipped (%@)" = "ignorado (%@)";
+"js error — %@" = "erro — %@";

@@ -1,3 +1,4 @@
+import AppKit
 import ClaudeSwitcherCore
 import UserNotifications
 
@@ -8,7 +9,15 @@ import UserNotifications
 /// network call at all — only reads the Keychain, the same mechanism as `cs list`.
 @MainActor
 final class ExpiryMonitor {
+    /// A single shared instance, not one per call site — `notifiedKeys`
+    /// dedup has to be shared too, or a one-off check (e.g. right after
+    /// importing an account) and the periodic one would each think they're
+    /// the first to notice the same expiry and send duplicate notifications.
+    static let shared = ExpiryMonitor()
+    private init() {}
+
     private var timer: Timer?
+    private var wakeObserver: NSObjectProtocol?
     /// Avoids notifying repeatedly for the same condition on every check —
     /// only fires again if the condition is resolved and then happens again.
     private var notifiedKeys: Set<String> = []
@@ -36,6 +45,26 @@ final class ExpiryMonitor {
                 Task { @MainActor in self?.check() }
             }
             self.check()
+
+            // A Timer's RunLoop doesn't run while the Mac is asleep — the 6h
+            // periodic check just resumes (possibly firing right away if it
+            // was already overdue) once the system wakes, which could mean
+            // up to 6h of delay after waking before an expiry a user cares
+            // about right now gets noticed. Wake is a much more likely
+            // moment for that to matter (closed the lid for the night,
+            // opened it back up) than any random point mid-sleep, so check
+            // again immediately then, on top of the regular interval.
+            self.wakeObserver = NSWorkspace.shared.notificationCenter.addObserver(
+                forName: NSWorkspace.didWakeNotification, object: nil, queue: .main
+            ) { [weak self] _ in
+                Task { @MainActor in self?.check() }
+            }
+        }
+    }
+
+    deinit {
+        if let wakeObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(wakeObserver)
         }
     }
 
@@ -61,44 +90,57 @@ final class ExpiryMonitor {
 
     private func check() {
         let (file, _) = AccountsConfig.load()
-        let now = Date()
-
         for account in file.accounts {
-            let status = AccountDiscovery.status(for: account)
-            guard let refreshExpiresAt = status.refreshTokenExpiresAt else { continue }
+            checkAccount(account)
+        }
+    }
 
-            let expiredKey = "\(account.slug)-expired"
-            let expiringKey = "\(account.slug)-expiring"
+    /// Checks a single account right away, outside the periodic schedule —
+    /// e.g. right after importing a `CLAUDE_CONFIG_DIR` that may already
+    /// hold an expired credential, so the user finds out immediately rather
+    /// than waiting up to checkInterval. Shares `notifiedKeys` with the
+    /// periodic check (same instance, see `shared`), so this never causes a
+    /// duplicate notification once the regular timer gets to this account.
+    func checkAccountImmediately(_ account: RegisteredAccount) {
+        checkAccount(account)
+    }
 
-            if refreshExpiresAt < now {
+    private func checkAccount(_ account: RegisteredAccount) {
+        let now = Date()
+        let status = AccountDiscovery.status(for: account)
+        guard let refreshExpiresAt = status.refreshTokenExpiresAt else { return }
+
+        let expiredKey = "\(account.slug)-expired"
+        let expiringKey = "\(account.slug)-expiring"
+
+        if refreshExpiresAt < now {
+            notify(
+                key: expiredKey,
+                title: String(
+                    format: NSLocalizedString("Session expired: %@", bundle: AppResources.bundle, comment: ""),
+                    account.name
+                ),
+                body: String(
+                    localized: "Open Claude Switcher and log in again to keep using this account.",
+                    bundle: AppResources.bundle
+                )
+            )
+        } else {
+            notifiedKeys.remove(expiredKey)
+            if refreshExpiresAt.timeIntervalSince(now) < warningWindow {
                 notify(
-                    key: expiredKey,
+                    key: expiringKey,
                     title: String(
-                        format: NSLocalizedString("Session expired: %@", bundle: AppResources.bundle, comment: ""),
+                        format: NSLocalizedString("Session expiring soon: %@", bundle: AppResources.bundle, comment: ""),
                         account.name
                     ),
                     body: String(
-                        localized: "Open Claude Switcher and log in again to keep using this account.",
-                        bundle: AppResources.bundle
+                        format: NSLocalizedString("Expires %@.", bundle: AppResources.bundle, comment: ""),
+                        refreshExpiresAt.formatted(Date.FormatStyle(date: .abbreviated, time: .shortened))
                     )
                 )
             } else {
-                notifiedKeys.remove(expiredKey)
-                if refreshExpiresAt.timeIntervalSince(now) < warningWindow {
-                    notify(
-                        key: expiringKey,
-                        title: String(
-                            format: NSLocalizedString("Session expiring soon: %@", bundle: AppResources.bundle, comment: ""),
-                            account.name
-                        ),
-                        body: String(
-                            format: NSLocalizedString("Expires %@.", bundle: AppResources.bundle, comment: ""),
-                            refreshExpiresAt.formatted(Date.FormatStyle(date: .abbreviated, time: .shortened))
-                        )
-                    )
-                } else {
-                    notifiedKeys.remove(expiringKey)
-                }
+                notifiedKeys.remove(expiringKey)
             }
         }
     }

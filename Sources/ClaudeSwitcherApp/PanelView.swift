@@ -309,6 +309,7 @@ final class PanelViewModel: ObservableObject {
     /// A newly created account never has a credential in the Keychain yet — the
     /// status is known in advance, without needing to query the Keychain for it.
     func confirmAddAccount() {
+        let wasImporting = importedConfigDir != nil
         do {
             let trimmedSlug = newAccountSlug.trimmingCharacters(in: .whitespaces)
             let account = try AccountsConfig.addAccount(
@@ -323,6 +324,12 @@ final class PanelViewModel: ObservableObject {
             // An imported account may already have a real credential —
             // unlike a brand-new one, don't assume "not logged in".
             accountStatuses[account.slug] = AccountDiscovery.status(for: account)
+            // A freshly created account can't possibly already be expired
+            // (it has no credential yet) — only worth checking for an
+            // imported one, which may carry a credential that's already bad.
+            if wasImporting {
+                ExpiryMonitor.shared.checkAccountImmediately(account)
+            }
             refresh()
             selectAccount(account.slug)
         } catch {
@@ -849,15 +856,13 @@ struct PanelView: View {
     /// to `--cds-role-{accent,warning,danger}-*` → `--cds-{blue-450,
     /// yellow-200,red-450}` in the resolved CSS. "normal" uses the site's blue
     /// (not the system accent) to match the reference screenshot.
-    private static let warningThreshold: Double = 75
-    private static let criticalThreshold: Double = 90
     private static let normalColor = Color(red: 0x2a / 255, green: 0x78 / 255, blue: 0xd6 / 255)
     private static let warningColor = Color(red: 0xfa / 255, green: 0xb2 / 255, blue: 0x19 / 255)
     private static let criticalColor = Color(red: 0xd0 / 255, green: 0x3b / 255, blue: 0x3b / 255)
 
     private func usageColor(for pct: Double) -> Color {
-        if pct >= Self.criticalThreshold { return Self.criticalColor }
-        if pct >= Self.warningThreshold { return Self.warningColor }
+        if pct >= UsageThresholds.critical { return Self.criticalColor }
+        if pct >= UsageThresholds.warning { return Self.warningColor }
         return Self.normalColor
     }
 

@@ -81,6 +81,13 @@
 "Test Expiry Notification" = "Test Expiry Notification";
 "Test notification" = "Test notification";
 "If you can see this, notifications are working correctly." = "If you can see this, notifications are working correctly.";
+
+/* Usage threshold notifications */
+"the 5h session" = "the 5h session";
+"the weekly limit" = "the weekly limit";
+"the weekly Opus limit" = "the weekly Opus limit";
+"High usage: %@" = "High usage: %@";
+"Passed %d%% of %@." = "Passed %d%% of %@.";
 "Quit" = "Quit";
 
 /* Right-click menu — alerts */

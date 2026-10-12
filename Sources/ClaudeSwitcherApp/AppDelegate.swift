@@ -2,16 +2,14 @@ import Cocoa
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusBarController: StatusBarController?
-    private var expiryMonitor: ExpiryMonitor?
     private var vscodeExtensionWatcher: VSCodeExtensionWatcher?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
         statusBarController = StatusBarController()
 
-        let monitor = ExpiryMonitor()
-        monitor.start()
-        expiryMonitor = monitor
+        ExpiryMonitor.shared.start()
+        UsageThresholdMonitor.shared.start()
 
         // The user leaves the app running indefinitely in the status bar — it's
         // not enough to apply the patch once at startup, it needs to keep

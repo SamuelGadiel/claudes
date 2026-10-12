@@ -20,11 +20,6 @@ final class StatusBarController: NSObject {
     private let launchAtLoginItem = NSMenuItem(
         title: String(localized: "Start at Login", bundle: AppResources.bundle), action: #selector(toggleLaunchAtLogin), keyEquivalent: ""
     )
-    /// Kept alive here, not a local variable in sendTestNotification() — its
-    /// own requestAuthorization call is asynchronous and holds `self` only
-    /// weakly, so a local instance would be deallocated before the
-    /// completion handler ever ran, silently dropping the test notification.
-    private var testNotificationMonitor: ExpiryMonitor?
 
     override init() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
@@ -248,13 +243,7 @@ final class StatusBarController: NSObject {
     }
 
     @objc private func sendTestNotification() {
-        // A separate instance from the app's real ExpiryMonitor (owned by
-        // AppDelegate) is fine — this doesn't touch its timer or
-        // notifiedKeys state — but it has to be this property, not a local,
-        // see testNotificationMonitor's declaration.
-        let monitor = ExpiryMonitor()
-        testNotificationMonitor = monitor
-        monitor.sendTestNotification()
+        ExpiryMonitor.shared.sendTestNotification()
     }
 
     @objc private func quit() {

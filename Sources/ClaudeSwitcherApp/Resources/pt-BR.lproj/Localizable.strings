@@ -10,9 +10,13 @@
 
 /* Panel — add account form */
 "Add Account…" = "Adicionar Conta…";
+"Import Existing Account…" = "Importar Conta Existente…";
+"Choose a Claude config directory to import" = "Escolha um diretório de configuração do Claude para importar";
+"Importing: %@" = "Importando: %@";
 "Account name (e.g.: Client X)" = "Nome da conta (ex.: Cliente X)";
 "Slug (identifier, e.g.: client-x)" = "Slug (identificador, ex.: cliente-x)";
 "Create" = "Criar";
+"Import" = "Importar";
 
 /* Panel — login prompt */
 "This account hasn't logged in yet." = "Essa conta ainda não fez login.";

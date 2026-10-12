@@ -41,6 +41,11 @@ final class PanelViewModel: ObservableObject {
     @Published var newAccountName = ""
     @Published var newAccountSlug = ""
     @Published var addAccountError: String?
+    /// Non-nil while the add-account form represents "import an existing
+    /// CLAUDE_CONFIG_DIR" rather than "create a brand-new one" — same form,
+    /// same confirmAddAccount(), just a pre-picked directory instead of the
+    /// ~/.claude-<slug> default.
+    @Published var importedConfigDir: String?
     /// While the user hasn't manually edited the slug, it tracks the
     /// typed name. Once edited by hand, it stops being overwritten.
     private var slugManuallyEdited = false
@@ -234,6 +239,20 @@ final class PanelViewModel: ObservableObject {
         newAccountSlug = ""
         slugManuallyEdited = false
         addAccountError = nil
+        importedConfigDir = nil
+        isAddingAccount = true
+    }
+
+    /// Same form as startAddingAccount(), but the directory is already
+    /// picked (an existing CLAUDE_CONFIG_DIR, e.g. one set up before this
+    /// app existed) instead of the ~/.claude-<slug> default — the user only
+    /// still needs to give it a name.
+    func startImportingAccount(dir: String) {
+        newAccountName = ""
+        newAccountSlug = ""
+        slugManuallyEdited = false
+        addAccountError = nil
+        importedConfigDir = dir
         isAddingAccount = true
     }
 
@@ -243,6 +262,7 @@ final class PanelViewModel: ObservableObject {
         newAccountSlug = ""
         slugManuallyEdited = false
         addAccountError = nil
+        importedConfigDir = nil
     }
 
     /// Called by the name TextField — while the slug hasn't been edited by
@@ -269,14 +289,17 @@ final class PanelViewModel: ObservableObject {
         do {
             let trimmedSlug = newAccountSlug.trimmingCharacters(in: .whitespaces)
             let account = try AccountsConfig.addAccount(
-                name: newAccountName, slugOverride: trimmedSlug.isEmpty ? nil : trimmedSlug
+                name: newAccountName, dir: importedConfigDir, slugOverride: trimmedSlug.isEmpty ? nil : trimmedSlug
             )
             isAddingAccount = false
             newAccountName = ""
             newAccountSlug = ""
             slugManuallyEdited = false
             addAccountError = nil
-            accountStatuses[account.slug] = AccountDiscovery.notLoggedInStatus(for: account)
+            importedConfigDir = nil
+            // An imported account may already have a real credential —
+            // unlike a brand-new one, don't assume "not logged in".
+            accountStatuses[account.slug] = AccountDiscovery.status(for: account)
             refresh()
             selectAccount(account.slug)
         } catch {
@@ -514,6 +537,11 @@ struct PanelView: View {
                         } label: {
                             Text("Add Account…", bundle: AppResources.bundle)
                         }
+                        Button {
+                            importExistingAccount()
+                        } label: {
+                            Text("Import Existing Account…", bundle: AppResources.bundle)
+                        }
                         if let account = selectedAccount {
                             Button(role: .destructive) {
                                 confirmAndRemove(account)
@@ -565,6 +593,25 @@ struct PanelView: View {
         return Text(Image(systemName: "exclamationmark.triangle.fill")) + Text(" " + account.name)
     }
 
+    /// Lets the user point at a `CLAUDE_CONFIG_DIR` that already exists on
+    /// disk (e.g. set up before this app existed) instead of creating a
+    /// fresh one — `AccountsConfig.addAccount(dir:)` already supports this,
+    /// SharedSessionsDirectory.adopt merges any real sessions it finds there
+    /// into the shared directory, same as it does for any other account.
+    private func importExistingAccount() {
+        let panel = NSOpenPanel()
+        panel.title = String(localized: "Choose a Claude config directory to import", bundle: AppResources.bundle)
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        viewModel.keepPopoverOpen = true
+        NSApp.activate(ignoringOtherApps: true)
+        let response = panel.runModal()
+        viewModel.keepPopoverOpen = false
+        guard response == .OK, let url = panel.urls.first else { return }
+        viewModel.startImportingAccount(dir: url.path)
+    }
+
     private func confirmAndRemove(_ account: RegisteredAccount) {
         // NSAlert is a separate system window — opening it steals the popover's
         // focus, and with .transient that would close the panel on its own before
@@ -603,6 +650,16 @@ struct PanelView: View {
     @ViewBuilder
     private var addAccountForm: some View {
         VStack(alignment: .leading, spacing: 6) {
+            if let dir = viewModel.importedConfigDir {
+                Text(String(
+                    format: NSLocalizedString("Importing: %@", bundle: AppResources.bundle, comment: ""), dir
+                ))
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+            }
+
             TextField(
                 text: Binding(get: { viewModel.newAccountName }, set: { viewModel.setAccountName($0) }),
                 label: { Text("Account name (e.g.: Client X)", bundle: AppResources.bundle) }
@@ -635,7 +692,10 @@ struct PanelView: View {
                 Button {
                     viewModel.confirmAddAccount()
                 } label: {
-                    Text("Create", bundle: AppResources.bundle)
+                    Text(
+                        viewModel.importedConfigDir != nil ? "Import" : "Create",
+                        bundle: AppResources.bundle
+                    )
                 }
                 .disabled(viewModel.newAccountName.trimmingCharacters(in: .whitespaces).isEmpty)
             }

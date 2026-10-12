@@ -149,6 +149,17 @@ public final class DisclaimedProcess {
         kill(pid, SIGTERM)
     }
 
+    /// `claude` in `--input-format stream-json ... -p` mode was observed
+    /// ignoring SIGTERM entirely (confirmed: closing stdin, waiting, then
+    /// `terminate()` left it running indefinitely — had to be killed with
+    /// SIGKILL from outside to actually go away). For a read-only flow like
+    /// get_usage (never mid-write, unlike CredentialRefresher/login), there's
+    /// no data-loss risk in forcing this.
+    public func forceTerminate() {
+        guard isRunning else { return }
+        kill(pid, SIGKILL)
+    }
+
     public func waitUntilExit() {
         guard isRunning else { return }
         var status: Int32 = 0

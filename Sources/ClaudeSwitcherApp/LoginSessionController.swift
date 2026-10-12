@@ -32,6 +32,12 @@ final class LoginSessionController: ObservableObject {
         let process = DisclaimedProcess()
         process.executableURL = URL(fileURLWithPath: ClaudeExecutable.resolve())
         process.arguments = ["auth", "login"]
+        // Fixed to /tmp, same reasoning as CredentialRefresher: this is a
+        // background utility call made by the GUI app (not the user's
+        // interactive project session via `cs`), and `claude` touching
+        // ~/Desktop, ~/Documents, ~/Downloads etc. during startup triggers
+        // TCC prompts attributed to this app for each of those folders.
+        process.currentDirectoryURL = URL(fileURLWithPath: "/tmp")
 
         var env = ProcessInfo.processInfo.environment
         env["CLAUDE_CONFIG_DIR"] = (configDir as NSString).expandingTildeInPath

@@ -204,7 +204,7 @@ func runSet(args: [String]) {
     do {
         let result = try VSCodeSettings.setConfigDir(projectPath: cwd, configDir: account.configDir)
         for warning in result.warnings {
-            print("\n\(warning)")
+            print("\n\(warning.englishText)")
         }
     } catch {
         print("\nWarning: could not update .vscode/settings.json: \(error)")
@@ -329,7 +329,7 @@ func runSetAccount(projectPath: String, accountName: String) {
         let result = try VSCodeSettings.setConfigDir(projectPath: projectPath, configDir: account.configDir)
         print("OK: \(result.settingsPath) now uses account '\(account.name)' (\(account.configDir)).")
         for warning in result.warnings {
-            print("\n\(warning)")
+            print("\n\(warning.englishText)")
         }
     } catch {
         print("Error updating settings.json: \(error)")

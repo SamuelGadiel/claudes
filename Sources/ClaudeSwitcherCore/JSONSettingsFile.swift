@@ -1,22 +1,31 @@
 import Foundation
 
-public enum JSONSettingsFileError: Error, CustomStringConvertible {
+public enum JSONSettingsFileError: LocalizableError, CustomStringConvertible {
     case invalidJSON(String)
     case ioError(String)
 
-    public var description: String {
+    public var l10nKey: String {
         switch self {
-        case .invalidJSON(let detail): return "invalid settings file: \(detail)"
-        case .ioError(let detail): return "IO error: \(detail)"
+        case .invalidJSON: return "invalid settings file: %@"
+        case .ioError: return "IO error: %@"
         }
     }
+
+    public var l10nArgs: [CVarArg] {
+        switch self {
+        case .invalidJSON(let detail): return [detail]
+        case .ioError(let detail): return [detail]
+        }
+    }
+
+    public var description: String { englishText }
 }
 
 /// Reading/writing of settings JSON files (VS Code, Claude Code) with a
 /// safe merge: never overwrites the whole file, only the keys the
 /// caller decides to change. Used by VSCodeSettings.
 public enum JSONSettingsFile {
-    public static func read(path: String, warnings: inout [String]) throws -> [String: Any] {
+    public static func read(path: String, warnings: inout [LocalizedWarning]) throws -> [String: Any] {
         guard let data = FileManager.default.contents(atPath: path) else {
             throw JSONSettingsFileError.ioError("could not read \(path)")
         }
@@ -43,7 +52,7 @@ public enum JSONSettingsFile {
     /// settings.json, plain JSON doesn't). If the second attempt is needed, the
     /// original comments are lost on save — this is warned about, never
     /// hidden.
-    private static func parse(data: Data, warnings: inout [String]) throws -> [String: Any] {
+    private static func parse(data: Data, warnings: inout [LocalizedWarning]) throws -> [String: Any] {
         if let obj = try? JSONSerialization.jsonObject(with: data), let dict = obj as? [String: Any] {
             return dict
         }
@@ -54,7 +63,7 @@ public enum JSONSettingsFile {
                let obj = try? JSONSerialization.jsonObject(with: strippedData),
                let dict = obj as? [String: Any] {
                 warnings.append(
-                    "the file had comments (JSONC) — they will be lost when this change is saved."
+                    LocalizedWarning(l10nKey: "the file had comments (JSONC) — they will be lost when this change is saved.")
                 )
                 return dict
             }

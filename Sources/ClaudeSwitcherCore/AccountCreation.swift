@@ -1,6 +1,6 @@
 import Foundation
 
-public enum AccountCreationError: Error, CustomStringConvertible {
+public enum AccountCreationError: LocalizableError, CustomStringConvertible {
     case emptyName
     case invalidSlug
     case reservedSlug(String)
@@ -9,17 +9,29 @@ public enum AccountCreationError: Error, CustomStringConvertible {
     case directoryCreationFailed(String)
     case notFound(String)
 
-    public var description: String {
+    public var l10nKey: String {
         switch self {
         case .emptyName: return "name cannot be empty"
         case .invalidSlug: return "could not generate a valid slug from the name"
-        case .reservedSlug(let slug): return "'\(slug)' is a reserved command — choose another name or provide a slug"
+        case .reservedSlug: return "'%@' is a reserved command — choose another name or provide a slug"
         case .duplicateAccount: return "an account with that name or slug already exists"
-        case .duplicateConfigDir(let dir): return "an account already registered pointing to \(dir) already exists"
-        case .directoryCreationFailed(let detail): return "error creating directory: \(detail)"
-        case .notFound(let identifier): return "account '\(identifier)' not found"
+        case .duplicateConfigDir: return "an account already registered pointing to %@ already exists"
+        case .directoryCreationFailed: return "error creating directory: %@"
+        case .notFound: return "account '%@' not found"
         }
     }
+
+    public var l10nArgs: [CVarArg] {
+        switch self {
+        case .reservedSlug(let slug): return [slug]
+        case .duplicateConfigDir(let dir): return [dir]
+        case .directoryCreationFailed(let detail): return [detail]
+        case .notFound(let identifier): return [identifier]
+        case .emptyName, .invalidSlug, .duplicateAccount: return []
+        }
+    }
+
+    public var description: String { englishText }
 }
 
 /// Account creation — logic shared between `cs add` and the equivalent

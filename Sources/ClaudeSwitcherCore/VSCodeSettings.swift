@@ -4,7 +4,7 @@ public typealias VSCodeSettingsError = JSONSettingsFileError
 
 public struct VSCodeSettingsResult {
     public let settingsPath: String
-    public let warnings: [String]
+    public let warnings: [LocalizedWarning]
 }
 
 /// Writes/updates CLAUDE_CONFIG_DIR in .vscode/settings.json doing a safe

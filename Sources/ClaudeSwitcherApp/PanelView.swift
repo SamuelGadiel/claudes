@@ -150,7 +150,7 @@ final class PanelViewModel: ObservableObject {
                 let target = ((session.configDirFromEnv ?? expandedDefault) as NSString).expandingTildeInPath
                 let label = accounts.first {
                     ($0.configDir as NSString).expandingTildeInPath == target
-                }?.name ?? "unregistered account"
+                }?.name ?? String(localized: "unregistered account", bundle: AppResources.bundle)
                 return TerminalSessionInfo(pid: session.pid, cwd: cwd, accountLabel: label)
             }
 
@@ -194,12 +194,18 @@ final class PanelViewModel: ObservableObject {
         do {
             try ClauderFile.write(accountSlug: newAccount.slug, inDir: project.path)
             let result = try VSCodeSettings.setConfigDir(projectPath: project.path, configDir: newAccount.configDir)
-            statusMessage = "\(project.name) now uses \(newAccount.name)"
+            statusMessage = String(
+                format: NSLocalizedString("%@ now uses %@", bundle: AppResources.bundle, comment: ""),
+                project.name, newAccount.name
+            )
             for warning in result.warnings {
-                statusMessage? += " — \(warning)"
+                statusMessage? += " — \(warning.localizedForDisplay)"
             }
         } catch {
-            statusMessage = "Error switching \(project.name): \(error)"
+            statusMessage = String(
+                format: NSLocalizedString("Error switching %@: %@", bundle: AppResources.bundle, comment: ""),
+                project.name, error.localizedForDisplay
+            )
         }
         refresh()
     }
@@ -210,9 +216,17 @@ final class PanelViewModel: ObservableObject {
     func clearChatHistory(project: ProjectInfo) {
         do {
             try SharedSessionsDirectory.clearHistory(forProjectPath: project.path)
-            statusMessage = "Chat history for \(project.name) cleared"
+            statusMessage = String(
+                format: NSLocalizedString("Chat history for %@ cleared", bundle: AppResources.bundle, comment: ""),
+                project.name
+            )
         } catch {
-            statusMessage = "Error clearing history for \(project.name): \(error)"
+            statusMessage = String(
+                format: NSLocalizedString(
+                    "Error clearing history for %@: %@", bundle: AppResources.bundle, comment: ""
+                ),
+                project.name, error.localizedForDisplay
+            )
         }
     }
 
@@ -222,9 +236,18 @@ final class PanelViewModel: ObservableObject {
     func switchTerminalSessionAccount(session: TerminalSessionInfo, to newAccount: RegisteredAccount) {
         do {
             try ClauderFile.write(accountSlug: newAccount.slug, inDir: session.cwd)
-            statusMessage = "\(session.cwd) will use \(newAccount.name) on the next run (the current session, pid \(session.pid), keeps the old account)"
+            statusMessage = String(
+                format: NSLocalizedString(
+                    "%@ will use %@ on the next run (the current session, pid %d, keeps the old account)",
+                    bundle: AppResources.bundle, comment: ""
+                ),
+                session.cwd, newAccount.name, session.pid
+            )
         } catch {
-            statusMessage = "Error writing .clauderc at \(session.cwd): \(error)"
+            statusMessage = String(
+                format: NSLocalizedString("Error writing .clauderc at %@: %@", bundle: AppResources.bundle, comment: ""),
+                session.cwd, error.localizedForDisplay
+            )
         }
         refresh()
     }
@@ -303,7 +326,7 @@ final class PanelViewModel: ObservableObject {
             refresh()
             selectAccount(account.slug)
         } catch {
-            addAccountError = "\(error)"
+            addAccountError = error.localizedForDisplay
         }
     }
 
@@ -326,7 +349,10 @@ final class PanelViewModel: ObservableObject {
                 }
             }
         } catch {
-            statusMessage = "Error removing '\(account.name)': \(error)"
+            statusMessage = String(
+                format: NSLocalizedString("Error removing '%@': %@", bundle: AppResources.bundle, comment: ""),
+                account.name, error.localizedForDisplay
+            )
         }
     }
 
@@ -355,7 +381,7 @@ final class PanelViewModel: ObservableObject {
             case .failure(let error):
                 let previous = usageStates[slug]
                 usageStates[slug] = AccountUsageState(
-                    isLoading: false, response: previous?.response, errorMessage: "\(error)"
+                    isLoading: false, response: previous?.response, errorMessage: error.localizedForDisplay
                 )
             }
         }

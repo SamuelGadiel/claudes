@@ -1,17 +1,27 @@
 import Foundation
 
-public enum UsageControlError: Error, CustomStringConvertible {
+public enum UsageControlError: LocalizableError, CustomStringConvertible {
     case processLaunchFailed(String)
     case timeout
     case decoding(Error)
 
-    public var description: String {
+    public var l10nKey: String {
         switch self {
-        case .processLaunchFailed(let detail): return "failed to execute claude: \(detail)"
+        case .processLaunchFailed: return "failed to execute claude: %@"
         case .timeout: return "claude did not respond in time"
-        case .decoding(let error): return "error decoding response: \(error)"
+        case .decoding: return "error decoding response: %@"
         }
     }
+
+    public var l10nArgs: [CVarArg] {
+        switch self {
+        case .processLaunchFailed(let detail): return [detail]
+        case .decoding(let error): return ["\(error)"]
+        case .timeout: return []
+        }
+    }
+
+    public var description: String { englishText }
 }
 
 /// Fetches the account's real usage by invoking the `claude` binary itself in the

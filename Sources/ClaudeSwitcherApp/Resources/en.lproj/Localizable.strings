@@ -99,3 +99,40 @@
 "patched now (%@)" = "patched now (%@)";
 "js skipped (%@)" = "skipped (%@)";
 "js error — %@" = "error — %@";
+
+/* Panel — status messages (PanelViewModel) */
+"unregistered account" = "unregistered account";
+"%@ now uses %@" = "%@ now uses %@";
+"Error switching %@: %@" = "Error switching %@: %@";
+"Chat history for %@ cleared" = "Chat history for %@ cleared";
+"Error clearing history for %@: %@" = "Error clearing history for %@: %@";
+"%@ will use %@ on the next run (the current session, pid %d, keeps the old account)" = "%@ will use %@ on the next run (the current session, pid %d, keeps the old account)";
+"Error writing .clauderc at %@: %@" = "Error writing .clauderc at %@: %@";
+"Error removing '%@': %@" = "Error removing '%@': %@";
+
+/* Login session flow — failures */
+"Could not start login: %@" = "Could not start login: %@";
+"The login process exited with code %d." = "The login process exited with code %d.";
+
+/* Core error messages (LocalizableError.l10nKey), shown in the GUI only —
+   the CLI renders the same keys directly in English, without going through
+   this table. Keep these in sync with Sources/ClaudeSwitcherCore. */
+"name cannot be empty" = "name cannot be empty";
+"could not generate a valid slug from the name" = "could not generate a valid slug from the name";
+"'%@' is a reserved command — choose another name or provide a slug" = "'%@' is a reserved command — choose another name or provide a slug";
+"an account with that name or slug already exists" = "an account with that name or slug already exists";
+"an account already registered pointing to %@ already exists" = "an account already registered pointing to %@ already exists";
+"error creating directory: %@" = "error creating directory: %@";
+"account '%@' not found" = "account '%@' not found";
+"failed to execute claude: %@" = "failed to execute claude: %@";
+"claude did not respond in time" = "claude did not respond in time";
+"error decoding response: %@" = "error decoding response: %@";
+"invalid settings file: %@" = "invalid settings file: %@";
+"IO error: %@" = "IO error: %@";
+"no executableURL set" = "no executableURL set";
+"posix_spawn failed with errno %d" = "posix_spawn failed with errno %d";
+
+/* Core warnings (GitRiskWarning.l10nKey), shown in the GUI only */
+"WARNING: %@ is tracked in this repository and is NOT in .gitignore. Writing CLAUDE_CONFIG_DIR here leaks your machine's local path to the team and forces your account on anyone else who opens the project. Consider adding %@ (or the .vscode/ folder) to .gitignore before proceeding." = "WARNING: %@ is tracked in this repository and is NOT in .gitignore. Writing CLAUDE_CONFIG_DIR here leaks your machine's local path to the team and forces your account on anyone else who opens the project. Consider adding %@ (or the .vscode/ folder) to .gitignore before proceeding.";
+"Warning: %@ is not yet committed nor in this repository's .gitignore. If this is a shared project, add it to .gitignore before running git add." = "Warning: %@ is not yet committed nor in this repository's .gitignore. If this is a shared project, add it to .gitignore before running git add.";
+"the file had comments (JSONC) — they will be lost when this change is saved." = "the file had comments (JSONC) — they will be lost when this change is saved.";

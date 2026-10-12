@@ -53,16 +53,25 @@ public final class DisclaimedProcess {
 
     public init() {}
 
-    public enum SpawnError: Error, CustomStringConvertible {
+    public enum SpawnError: LocalizableError, CustomStringConvertible {
         case noExecutableURL
         case spawnFailed(Int32)
 
-        public var description: String {
+        public var l10nKey: String {
             switch self {
             case .noExecutableURL: return "no executableURL set"
-            case .spawnFailed(let code): return "posix_spawn failed with errno \(code)"
+            case .spawnFailed: return "posix_spawn failed with errno %d"
             }
         }
+
+        public var l10nArgs: [CVarArg] {
+            switch self {
+            case .noExecutableURL: return []
+            case .spawnFailed(let code): return [code]
+            }
+        }
+
+        public var description: String { englishText }
     }
 
     public func run() throws {

@@ -130,7 +130,7 @@ final class StatusBarController: NSObject {
         } catch {
             let alert = NSAlert()
             alert.messageText = String(localized: "Could not change this", bundle: AppResources.bundle)
-            alert.informativeText = "\(error)"
+            alert.informativeText = error.localizedForDisplay
             alert.alertStyle = .warning
             alert.addButton(withTitle: String(localized: "OK", bundle: AppResources.bundle))
             NSApp.activate(ignoringOtherApps: true)
@@ -244,6 +244,11 @@ extension StatusBarController: NSPopoverDelegate {
     /// togglePopover().
     func popoverDidClose(_ notification: Notification) {
         viewModel.stopPolling()
+        // The status message (e.g. "X now uses Y") is only meant to confirm
+        // the action that was just taken — once the panel is closed, that
+        // confirmation has been seen, so it shouldn't still be sitting there
+        // the next time the panel opens.
+        viewModel.statusMessage = nil
     }
 }
 

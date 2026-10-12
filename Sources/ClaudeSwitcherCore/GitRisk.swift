@@ -5,7 +5,7 @@ import Foundation
 /// CLAUDE_CONFIG_DIR is a path local to the user's machine and should never
 /// be committed in a shared project.
 enum GitRisk {
-    static func warnings(forProjectPath projectPath: String, relativeFile: String) -> [String] {
+    static func warnings(forProjectPath projectPath: String, relativeFile: String) -> [LocalizedWarning] {
         guard isInsideGitWorkTree(cwd: projectPath) else { return [] }
 
         if isIgnored(cwd: projectPath, relativePath: relativeFile) {
@@ -14,17 +14,22 @@ enum GitRisk {
 
         if isTracked(cwd: projectPath, relativePath: relativeFile) {
             return [
-                "WARNING: \(relativeFile) is tracked in this repository and is NOT in " +
-                ".gitignore. Writing CLAUDE_CONFIG_DIR here leaks your machine's local path " +
-                "to the team and forces your account on anyone else who opens the project. Consider adding " +
-                "\(relativeFile) (or the .vscode/ folder) to .gitignore before proceeding."
+                LocalizedWarning(
+                    l10nKey: "WARNING: %@ is tracked in this repository and is NOT in .gitignore. "
+                        + "Writing CLAUDE_CONFIG_DIR here leaks your machine's local path to the team "
+                        + "and forces your account on anyone else who opens the project. Consider adding "
+                        + "%@ (or the .vscode/ folder) to .gitignore before proceeding.",
+                    l10nArgs: [relativeFile, relativeFile]
+                )
             ]
         }
 
         return [
-            "Warning: \(relativeFile) is not yet committed nor in this " +
-            "repository's .gitignore. If this is a shared project, add it to .gitignore before " +
-            "running git add."
+            LocalizedWarning(
+                l10nKey: "Warning: %@ is not yet committed nor in this repository's .gitignore. "
+                    + "If this is a shared project, add it to .gitignore before running git add.",
+                l10nArgs: [relativeFile]
+            )
         ]
     }
 

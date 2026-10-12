@@ -65,7 +65,10 @@ final class LoginSessionController: ObservableObject {
         do {
             try process.run()
         } catch {
-            state = .failure("Could not start login: \(error)")
+            state = .failure(String(
+                format: NSLocalizedString("Could not start login: %@", bundle: AppResources.bundle, comment: ""),
+                error.localizedForDisplay
+            ))
         }
     }
 
@@ -94,7 +97,10 @@ final class LoginSessionController: ObservableObject {
         if status == 0 {
             state = .success
         } else if state != .idle {
-            state = .failure("The login process exited with code \(status).")
+            state = .failure(String(
+                format: NSLocalizedString("The login process exited with code %d.", bundle: AppResources.bundle, comment: ""),
+                status
+            ))
         }
     }
 

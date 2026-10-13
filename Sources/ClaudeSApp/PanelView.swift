@@ -6,6 +6,10 @@ struct ProjectInfo: Identifiable {
     let path: String
     let name: String
     var currentAccountSlug: String?
+    /// true when `currentAccountSlug` came from falling back to the default
+    /// account (no .clauderc, or one pointing at a slug that no longer
+    /// exists) rather than an explicit, valid .clauderc for this project.
+    var usingDefaultFallback: Bool = false
     var id: String { path }
 }
 
@@ -135,10 +139,19 @@ final class PanelViewModel: ObservableObject {
         // live snapshot — it keeps whatever was last written even after VS
         // Code fully quits. Without this check, the last project open before
         // quitting would show up here forever as still "open".
+        // Same resolution AccountResolver/`cs status` use (explicit .clauderc,
+        // falling back to the default account) — using ClauderFile.find directly
+        // here used to disagree with the CLI whenever there was no .clauderc, or
+        // one pointing at a slug no longer registered (e.g. a renamed account).
         projects = Self.isVSCodeRunning
             ? OpenedWindowsReader.read().map { window in
-                let slug = ClauderFile.find(startingAt: window.path)?.account
-                return ProjectInfo(path: window.path, name: window.name, currentAccountSlug: slug)
+                let hasValidClauderc = ClauderFile.find(startingAt: window.path)
+                    .flatMap { AccountsConfig.find(identifier: $0.account, in: file) } != nil
+                let resolved = AccountResolver.resolve(forCwd: window.path, in: file)
+                return ProjectInfo(
+                    path: window.path, name: window.name,
+                    currentAccountSlug: resolved?.slug, usingDefaultFallback: !hasValidClauderc
+                )
             }
             : []
 
@@ -178,11 +191,18 @@ final class PanelViewModel: ObservableObject {
         accountStatuses[slug]?.loginState == .expired
     }
 
-    func accountName(forSlug slug: String?) -> String {
-        guard let slug, let account = accounts.first(where: { $0.slug == slug }) else {
-            return String(localized: "No account set", bundle: AppResources.bundle)
+    /// Labels a project row: the resolved account's name, qualified with
+    /// "using default" when there's no explicit, valid .clauderc for it —
+    /// distinct from "no account registered at all" (empty accounts.json).
+    func accountLabel(for project: ProjectInfo) -> String {
+        guard let slug = project.currentAccountSlug, let account = accounts.first(where: { $0.slug == slug }) else {
+            return String(localized: "No account registered", bundle: AppResources.bundle)
         }
-        return account.name
+        guard project.usingDefaultFallback else { return account.name }
+        return String(
+            format: NSLocalizedString("Using default account: %@", bundle: AppResources.bundle, comment: ""),
+            account.name
+        )
     }
 
     /// Switches the account of a project (.clauderc + .vscode/settings.json —
@@ -334,6 +354,25 @@ final class PanelViewModel: ObservableObject {
             selectAccount(account.slug)
         } catch {
             addAccountError = error.localizedForDisplay
+        }
+    }
+
+    /// Makes `account` the one used for any project/terminal session with no
+    /// explicit (or valid) .clauderc — same effect as `cs default`.
+    func setAsDefaultAccount(_ account: RegisteredAccount) {
+        do {
+            try AccountsConfig.setDefault(slug: account.slug)
+            defaultSlug = account.slug
+            statusMessage = String(
+                format: NSLocalizedString("'%@' is now the default account", bundle: AppResources.bundle, comment: ""),
+                account.name
+            )
+            refresh()
+        } catch {
+            statusMessage = String(
+                format: NSLocalizedString("Error setting '%@' as default: %@", bundle: AppResources.bundle, comment: ""),
+                account.name, error.localizedForDisplay
+            )
         }
     }
 
@@ -574,6 +613,18 @@ struct PanelView: View {
                             importExistingAccount()
                         } label: {
                             Text("Import Existing Account…", bundle: AppResources.bundle)
+                        }
+                        if let account = selectedAccount, account.slug != viewModel.defaultSlug {
+                            Button {
+                                viewModel.setAsDefaultAccount(account)
+                            } label: {
+                                Text(String(
+                                    format: NSLocalizedString(
+                                        "Set \"%@\" as Default", bundle: AppResources.bundle, comment: ""
+                                    ),
+                                    account.name
+                                ))
+                            }
                         }
                         if let account = selectedAccount {
                             Button(role: .destructive) {
@@ -962,7 +1013,7 @@ struct PanelView: View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
                 Text(project.name)
-                Text(viewModel.accountName(forSlug: project.currentAccountSlug))
+                Text(viewModel.accountLabel(for: project))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

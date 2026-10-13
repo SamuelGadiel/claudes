@@ -113,4 +113,13 @@ public enum AccountsConfig {
         guard let slug = file.defaultAccountSlug else { return nil }
         return file.accounts.first { $0.slug == slug }
     }
+
+    public static func setDefault(slug: String) throws {
+        var (file, _) = load()
+        guard file.accounts.contains(where: { $0.slug == slug }) else {
+            throw AccountCreationError.notFound(slug)
+        }
+        file.defaultAccountSlug = slug
+        save(file)
+    }
 }

@@ -5,3 +5,6 @@
 .vscode/
 /site/
 /dist/
+
+# Per-developer Claude account selection (claudes) — not shared with the team
+.clauderc

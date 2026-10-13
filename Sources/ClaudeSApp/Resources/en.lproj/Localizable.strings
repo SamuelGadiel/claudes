@@ -42,7 +42,11 @@
 "Clear Chat History…" = "Clear Chat History…";
 "Not updated: %@" = "Not updated: %@";
 "used %.2f of %.2f" = "used %.2f of %.2f";
-"No account set" = "No account set";
+"No account registered" = "No account registered";
+"Using default account: %@" = "Using default account: %@";
+"Set \"%@\" as Default" = "Set \"%@\" as Default";
+"'%@' is now the default account" = "'%@' is now the default account";
+"Error setting '%@' as default: %@" = "Error setting '%@' as default: %@";
 
 /* Panel — weekday names used in the weekly reset label, Sunday(1)..Saturday(7) */
 "weekday_short_1" = "Sunday";

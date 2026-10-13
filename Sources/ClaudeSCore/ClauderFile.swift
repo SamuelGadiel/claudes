@@ -37,10 +37,15 @@ public enum ClauderFile {
     }
 
     public static func write(accountSlug: String, inDir dir: String) throws {
-        let path = (dir as NSString).expandingTildeInPath + "/" + filename
+        let expandedDir = (dir as NSString).expandingTildeInPath
+        let path = expandedDir + "/" + filename
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         let data = try encoder.encode(ClauderC(account: accountSlug))
         try data.write(to: URL(fileURLWithPath: path))
+        GitRisk.ensureIgnored(
+            forProjectPath: expandedDir, relativeFile: filename,
+            comment: "Per-developer Claude account selection (claudes) — not shared with the team"
+        )
     }
 }

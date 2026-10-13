@@ -134,10 +134,12 @@ final class UsageThresholdMonitor {
         lastSnapshot[snapshotKey] = WindowSnapshot(resetsAt: resetsAt, utilization: utilization)
 
         // The window reset since the last check (its resetsAt moved to a new
-        // point in time) and it was high enough to matter before resetting —
-        // tell the user their quota freed up instead of making them remember
-        // to go check.
-        if let previous, previous.resetsAt < resetsAt, previous.utilization >= UsageThresholds.warning {
+        // point in time) and it was actually exhausted before resetting —
+        // not just high. Someone who peaked at 80% and never got blocked
+        // doesn't care that the window reset, they were never stopped by
+        // it; this is for "I hit the wall, went to do something else, and
+        // now I'd otherwise forget to come back."
+        if let previous, previous.resetsAt < resetsAt, previous.utilization >= UsageThresholds.exhausted {
             notify(
                 key: "reset-\(snapshotKey)-\(Int(resetsAt.timeIntervalSince1970))",
                 title: String(

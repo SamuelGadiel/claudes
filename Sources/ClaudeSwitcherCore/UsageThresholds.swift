@@ -6,4 +6,10 @@ import Foundation
 public enum UsageThresholds {
     public static let warning: Double = 75
     public static let critical: Double = 90
+    /// Fully out of quota — claude.ai stops serving requests at this point.
+    /// Distinct from `critical`: a "your quota is back" notification is only
+    /// worth sending when the window was actually exhausted, not merely high
+    /// — someone at 80% who never got blocked doesn't need to be told the
+    /// window reset, they were never stopped by it.
+    public static let exhausted: Double = 100
 }

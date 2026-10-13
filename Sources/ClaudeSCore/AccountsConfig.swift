@@ -9,15 +9,28 @@ private struct LegacyAccount: Decodable {
 }
 
 public enum AccountsConfig {
-    public static let configDirPath = ("~/Library/Application Support/ClaudeSwitcher" as NSString)
+    public static let configDirPath = ("~/Library/Application Support/ClaudeS" as NSString)
         .expandingTildeInPath
     public static let configFilePath = configDirPath + "/accounts.json"
+
+    /// The whole project (and this folder along with it) was renamed from
+    /// "Claude Switcher" — moved here, once, so accounts registered before
+    /// the rename aren't orphaned.
+    private static let legacyConfigDirPath = ("~/Library/Application Support/ClaudeSwitcher" as NSString)
+        .expandingTildeInPath
+
+    private static func migrateFromLegacyAppSupportDirIfNeeded() {
+        let fm = FileManager.default
+        guard !fm.fileExists(atPath: configDirPath), fm.fileExists(atPath: legacyConfigDirPath) else { return }
+        try? fm.moveItem(atPath: legacyConfigDirPath, toPath: configDirPath)
+    }
 
     /// `messages` carries informational notices (config created, file migrated)
     /// for the caller to decide how to display — Core never prints directly,
     /// since it's shared between the `cs` CLI and the future status bar GUI.
     public static func load() -> (file: AccountsFile, messages: [String]) {
         let fm = FileManager.default
+        migrateFromLegacyAppSupportDirIfNeeded()
 
         guard fm.fileExists(atPath: configFilePath) else {
             let defaults = AccountsFile(

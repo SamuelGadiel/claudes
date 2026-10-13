@@ -91,7 +91,7 @@ correção, o mecanismo descrito abaixo passa a funcionar de fato.
 
 ## Implementado e validado
 
-`VSCodeSettings.setConfigDir` (em `Sources/claude-switcher-cli/VSCodeSettings.swift`)
+`VSCodeSettings.setConfigDir` (em `Sources/ClaudeSCore/VSCodeSettings.swift`)
 faz o merge via `JSONSerialization` (não regex), sempre grava o
 `CLAUDE_CONFIG_DIR` **expandido para path absoluto** (nunca `~`, porque o
 processo que lê a env var não expande `~` sozinho — isso é responsabilidade

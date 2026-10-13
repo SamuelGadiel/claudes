@@ -95,10 +95,10 @@ public enum ClaudePatchCoordinator {
 
         if log {
             if entries.isEmpty {
-                NSLog("claude-switcher: no Claude extension installation found (VS Code/Insiders)")
+                NSLog("claudes: no Claude extension installation found (VS Code/Insiders)")
             } else {
                 for entry in entries {
-                    NSLog("claude-switcher: Claude extension patch (\(entry.root)) — \(entry.scope); \(entry.js)")
+                    NSLog("claudes: Claude extension patch (\(entry.root)) — \(entry.scope); \(entry.js)")
                 }
             }
         }

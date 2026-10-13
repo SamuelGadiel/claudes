@@ -1,5 +1,5 @@
 import AppKit
-import ClaudeSwitcherCore
+import ClaudeSCore
 import SwiftUI
 
 struct ProjectInfo: Identifiable {

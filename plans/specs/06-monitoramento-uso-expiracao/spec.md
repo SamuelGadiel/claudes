@@ -169,7 +169,7 @@ autenticar/chamar corretamente), a diferença de comportamento por conta
 desaparece — testado e confirmado funcionando perfeitamente para Pessoal e
 Trabalho.
 
-`UsageControlClient.fetch(configDir:)` (`Sources/ClaudeSwitcherCore/`)
+`UsageControlClient.fetch(configDir:)` (`Sources/ClaudeSCore/`)
 implementa isso: spawna `claude --input-format stream-json --output-format
 stream-json -p` com `CLAUDE_CONFIG_DIR` da conta, escreve
 `{"type":"control_request","request_id":"...","request":{"subtype":

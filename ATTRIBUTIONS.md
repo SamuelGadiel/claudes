@@ -2,7 +2,7 @@
 
 ## leog/claude-code-config-dir-patcher-vscode
 
-`Sources/ClaudeSwitcherCore/ClaudeExtensionJSPatcher.swift` é uma reimplementação
+`Sources/ClaudeSCore/ClaudeExtensionJSPatcher.swift` é uma reimplementação
 em Swift (não uma cópia literal do código-fonte) dos padrões de regex e da
 lógica de análise/transformação originalmente publicados por **Leo Giovanetti**
 em [leog/claude-code-config-dir-patcher-vscode](https://github.com/leog/claude-code-config-dir-patcher-vscode)

@@ -20,9 +20,15 @@ public enum ShellInstallError: Error, CustomStringConvertible {
 }
 
 public struct ShellInstallResult {
+    /// `cs`'s own link — kept as the primary path for backward compatibility
+    /// with anything already reading this result's old shape.
     public let linkPath: String
     public let targetPath: String
     public let linkDirInPath: Bool
+    /// The `claudes` alias installed alongside `cs`, same directory, same
+    /// target — identical behavior either way, since the CLI only ever
+    /// looks at its arguments, never at which name it was invoked as.
+    public let aliasLinkPath: String
 }
 
 public enum ShellInstall {
@@ -61,28 +67,41 @@ public enum ShellInstall {
             }
             guard fm.isWritableFile(atPath: dir) else { continue }
 
-            let linkPath = dir + "/cs"
+            guard let csLink = ensureLink(named: "cs", to: target, in: dir, fm: fm) else { continue }
+            // Best-effort: if `cs` installed but `claudes` somehow can't
+            // (shouldn't happen, same dir/target just confirmed writable),
+            // still return success for `cs` rather than failing the whole
+            // install over the alias.
+            let claudesLink = ensureLink(named: "claudes", to: target, in: dir, fm: fm) ?? (dir + "/claudes")
 
-            if let existing = try? fm.destinationOfSymbolicLink(atPath: linkPath), existing == target {
-                return ShellInstallResult(
-                    linkPath: linkPath, targetPath: target, linkDirInPath: pathContains(dir)
-                )
-            }
-            if fm.fileExists(atPath: linkPath) {
-                try? fm.removeItem(atPath: linkPath)
-            }
-
-            do {
-                try fm.createSymbolicLink(atPath: linkPath, withDestinationPath: target)
-                return ShellInstallResult(
-                    linkPath: linkPath, targetPath: target, linkDirInPath: pathContains(dir)
-                )
-            } catch {
-                continue
-            }
+            return ShellInstallResult(
+                linkPath: csLink, targetPath: target, linkDirInPath: pathContains(dir),
+                aliasLinkPath: claudesLink
+            )
         }
 
         throw ShellInstallError.noWritableDirectory(candidateDirs)
+    }
+
+    /// Creates (or repoints) `<dir>/<name>` as a symlink to `target`. Returns
+    /// nil only on an actual filesystem failure — not finding anything to
+    /// change (already correct) still returns the path.
+    private static func ensureLink(named name: String, to target: String, in dir: String, fm: FileManager) -> String? {
+        let linkPath = dir + "/" + name
+
+        if let existing = try? fm.destinationOfSymbolicLink(atPath: linkPath), existing == target {
+            return linkPath
+        }
+        if fm.fileExists(atPath: linkPath) {
+            try? fm.removeItem(atPath: linkPath)
+        }
+
+        do {
+            try fm.createSymbolicLink(atPath: linkPath, withDestinationPath: target)
+            return linkPath
+        } catch {
+            return nil
+        }
     }
 
     private static func pathContains(_ dir: String) -> Bool {

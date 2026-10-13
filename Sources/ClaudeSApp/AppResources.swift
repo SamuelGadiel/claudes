@@ -19,7 +19,7 @@ import Foundation
 enum AppResources {
     static let bundle: Bundle = {
         if let resourcesURL = Bundle.main.resourceURL {
-            let candidate = resourcesURL.appendingPathComponent("claude-switcher_ClaudeSwitcherApp.bundle")
+            let candidate = resourcesURL.appendingPathComponent("claudes_ClaudeSApp.bundle")
             if let bundle = Bundle(url: candidate) {
                 return bundle
             }

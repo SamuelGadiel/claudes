@@ -1,4 +1,4 @@
-# claude-switcher — Visão Geral
+# claudes (ClaudeS) — Visão Geral
 
 ## Problema
 

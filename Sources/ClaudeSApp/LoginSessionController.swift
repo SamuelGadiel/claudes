@@ -1,4 +1,4 @@
-import ClaudeSwitcherCore
+import ClaudeSCore
 import Foundation
 
 /// Controls `claude auth login` directly (stdin/stdout via Pipe, no

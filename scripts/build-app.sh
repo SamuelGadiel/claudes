@@ -1,15 +1,15 @@
 #!/bin/bash
-# Builds ClaudeSwitcher.app — a real, launchable macOS app bundle — from the
-# release build of the ClaudeSwitcherApp executable target. Ad-hoc signed
+# Builds ClaudeS.app — a real, launchable macOS app bundle — from the
+# release build of the ClaudeSApp executable target. Ad-hoc signed
 # (no Apple Developer account needed); see plans/KANBAN.md for the plan to
 # move to a real Developer ID + notarization later.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
 ROOT_DIR="$(pwd)"
-APP_NAME="ClaudeSwitcher"
-EXECUTABLE_NAME="ClaudeSwitcherApp"
-RESOURCE_BUNDLE_NAME="claude-switcher_ClaudeSwitcherApp.bundle"
+APP_NAME="ClaudeS"
+EXECUTABLE_NAME="ClaudeSApp"
+RESOURCE_BUNDLE_NAME="claudes_ClaudeSApp.bundle"
 BUILD_DIR=".build/apple/Products/Release"
 OUT_DIR="dist"
 APP_BUNDLE="$OUT_DIR/$APP_NAME.app"

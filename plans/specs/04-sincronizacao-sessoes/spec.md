@@ -13,7 +13,7 @@ Resolve: P4
 
 `<CLAUDE_CONFIG_DIR>/projects` deixa de existir como diretório próprio de
 cada conta — é sempre um symlink apontando para `SharedSessionsDirectory`
-(`~/.claude-shared-chats`, `Sources/ClaudeSwitcherCore/SharedSessionsDirectory.swift`).
+(`~/.claude-shared-chats`, `Sources/ClaudeSCore/SharedSessionsDirectory.swift`).
 Chats passam a pertencer ao **projeto**, não à conta que estava logada quando
 foram escritos — não importa qual conta está ativa, o histórico completo de
 qualquer projeto está sempre lá.

@@ -46,29 +46,6 @@ public struct UsageResponse: Decodable, Sendable {
     }
 }
 
-public enum UsageAPIError: Error, CustomStringConvertible {
-    case unauthorized
-    case rateLimited(retryAfter: TimeInterval?)
-    case http(Int)
-    case transport(Error)
-    case decoding(Error)
-
-    public var description: String {
-        switch self {
-        case .unauthorized:
-            return "token rejected by Anthropic — it may have expired or been revoked"
-        case .rateLimited(let retryAfter):
-            return "usage endpoint rate limited" + (retryAfter.map { " (retry in \(Int($0))s)" } ?? "")
-        case .http(let code):
-            return "usage endpoint returned HTTP \(code)"
-        case .transport(let error):
-            return "network error: \(error.localizedDescription)"
-        case .decoding(let error):
-            return "error decoding response: \(error)"
-        }
-    }
-}
-
 /// The API returns ISO 8601 dates with microseconds and a "+00:00" offset
 /// (e.g. "2026-10-12T08:59:59.551118+00:00") — JSONDecoder's default
 /// formatter (`.iso8601`) doesn't accept fractional seconds, hence the
@@ -98,47 +75,3 @@ enum UsageDateParsing {
     }
 }
 
-public enum UsageAPIClient {
-    static let endpoint = URL(string: "https://api.anthropic.com/api/oauth/usage")!
-
-    public static func fetch(accessToken: String) async throws -> UsageResponse {
-        var request = URLRequest(url: endpoint)
-        request.httpMethod = "GET"
-        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
-        request.setValue("oauth-2025-04-20", forHTTPHeaderField: "anthropic-beta")
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.setValue("ClaudeSwitcher/0.1 (macOS menu bar)", forHTTPHeaderField: "User-Agent")
-
-        let data: Data
-        let response: URLResponse
-        do {
-            (data, response) = try await URLSession.shared.data(for: request)
-        } catch {
-            throw UsageAPIError.transport(error)
-        }
-
-        guard let http = response as? HTTPURLResponse else {
-            throw UsageAPIError.transport(URLError(.badServerResponse))
-        }
-
-        switch http.statusCode {
-        case 200:
-            break
-        case 401:
-            throw UsageAPIError.unauthorized
-        case 429:
-            let retryAfter = http.value(forHTTPHeaderField: "Retry-After").flatMap(TimeInterval.init)
-            throw UsageAPIError.rateLimited(retryAfter: retryAfter)
-        default:
-            throw UsageAPIError.http(http.statusCode)
-        }
-
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .custom { try UsageDateParsing.decode($0) }
-        do {
-            return try decoder.decode(UsageResponse.self, from: data)
-        } catch {
-            throw UsageAPIError.decoding(error)
-        }
-    }
-}

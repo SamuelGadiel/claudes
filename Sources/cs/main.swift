@@ -1,4 +1,4 @@
-import ClaudeSwitcherCore
+import ClaudeSCore
 import Foundation
 
 func printUsage() {
@@ -303,8 +303,9 @@ func runInstallCli() {
     do {
         let result = try ShellInstall.install()
         print("OK: \(result.linkPath) -> \(result.targetPath)")
+        print("OK: \(result.aliasLinkPath) -> \(result.targetPath) (alias)")
         if result.linkDirInPath {
-            print("Done — open a new terminal (or run 'exec $SHELL') and 'cs' will work.")
+            print("Done — open a new terminal (or run 'exec $SHELL') and 'cs'/'claudes' will work.")
         } else {
             let dir = (result.linkPath as NSString).deletingLastPathComponent
             print(
@@ -374,7 +375,7 @@ case "set-account":
 case "help", "-h", "--help":
     printUsage()
 case "-v", "--version":
-    print("cs (claude-switcher) dev")
+    print("cs (claudes) dev")
 default:
     // Gateway: treats the first argument as an account slug and passes the
     // rest to the real claude (e.g.: "cs work auth login").

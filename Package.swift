@@ -2,23 +2,23 @@
 import PackageDescription
 
 let package = Package(
-    name: "claude-switcher",
+    name: "claudes",
     defaultLocalization: "en",
     platforms: [.macOS(.v13)],
     targets: [
         .target(
-            name: "ClaudeSwitcherCore",
-            path: "Sources/ClaudeSwitcherCore"
+            name: "ClaudeSCore",
+            path: "Sources/ClaudeSCore"
         ),
         .executableTarget(
             name: "cs",
-            dependencies: ["ClaudeSwitcherCore"],
+            dependencies: ["ClaudeSCore"],
             path: "Sources/cs"
         ),
         .executableTarget(
-            name: "ClaudeSwitcherApp",
-            dependencies: ["ClaudeSwitcherCore"],
-            path: "Sources/ClaudeSwitcherApp",
+            name: "ClaudeSApp",
+            dependencies: ["ClaudeSCore"],
+            path: "Sources/ClaudeSApp",
             resources: [.process("Resources")]
         ),
     ]

@@ -103,11 +103,11 @@ puro para o comando nativo `claude auth login` (confirmado via
 
 ## Arquitetura do Swift Package (preparando para o app de status bar)
 
-O pacote agora tem dois targets: `ClaudeSwitcherCore` (library — toda a
+O pacote agora tem dois targets: `ClaudeSCore` (library — toda a
 lógica: Keychain, contas, `.clauderc`, settings.json, sync, gateway,
 instalação) e `cs` (executável — só parsing de argumentos + prints). O
 futuro app de status bar (spec 05) vai ser um terceiro target que depende da
-mesma `ClaudeSwitcherCore`, sem duplicar nada. O Core nunca imprime direto
+mesma `ClaudeSCore`, sem duplicar nada. O Core nunca imprime direto
 (`AccountsConfig.load()` retorna `(file, messages)` em vez de fazer
 `print()`) — quem decide como exibir é sempre o consumidor (CLI hoje, GUI
 depois).
@@ -124,7 +124,7 @@ de um diretório já no PATH — mesmo padrão do "Install 'code' command in
 PATH" do VS Code. Resolve o caminho do executável **em runtime**
 (`CommandLine.arguments[0]`, resolvendo symlinks), nunca hardcoded — por
 isso funciona idêntico hoje (`swift run`/`.build/debug/cs`) e depois, quando
-`cs` estiver embutido num `.app` (`~/Applications/ClaudeSwitcher.app/...` ou
+`cs` estiver embutido num `.app` (`~/Applications/ClaudeS.app/...` ou
 `/Applications/...`).
 
 Ordem de diretórios tentados: `/usr/local/bin` primeiro (convenção histórica

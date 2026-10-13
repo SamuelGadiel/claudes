@@ -1,4 +1,4 @@
-import ClaudeSwitcherCore
+import ClaudeSCore
 import Foundation
 
 /// The single place the GUI decides to show Core-level text (errors,

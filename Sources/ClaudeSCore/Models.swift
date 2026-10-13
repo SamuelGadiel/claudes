@@ -29,7 +29,7 @@ public struct RegisteredAccount: Codable {
     }
 }
 
-/// ~/Library/Application Support/ClaudeSwitcher/accounts.json
+/// ~/Library/Application Support/ClaudeS/accounts.json
 public struct AccountsFile: Codable {
     public var accounts: [RegisteredAccount]
     /// Slug of the account used when the project doesn't define one (via .clauderc).

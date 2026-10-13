@@ -87,7 +87,7 @@ execução"), não sugerir efeito imediato.
   `TabView`, `ProgressView` etc. com toda a liberdade do SwiftUI).
 - Clique direito → `NSMenu` clássico de verdade (`statusItem.menu`),
   populado com os itens básicos (ver abaixo).
-- Toda a lógica de dados vem de `ClaudeSwitcherCore` (mesmo Core do `cs`) —
+- Toda a lógica de dados vem de `ClaudeSCore` (mesmo Core do `cs`) —
   este target só monta UI em cima dela, igual o `cs` só faz parsing/print
   em cima dela. Nenhuma duplicação de lógica de negócio.
 
@@ -95,7 +95,7 @@ execução"), não sugerir efeito imediato.
 
 ```
 Projetos abertos (VS Code)
-  claude-switcher              Pessoal   [trocar ▾]
+  claudes                      Pessoal   [trocar ▾]
   sivisamais_mobile_agente     Trabalho  [trocar ▾]
 ―――――――――――――――――――――――――――
 Sessões de terminal
@@ -112,7 +112,7 @@ endpoint real `GET /api/oauth/usage`, não é mais bloqueio).
 
 ## Menu clássico (clique direito)
 
-Verificar atualizações · Sobre o Claude Switcher · Sair.
+Verificar atualizações · Sobre o ClaudeS · Sair.
 
 ## Modelo de dados
 

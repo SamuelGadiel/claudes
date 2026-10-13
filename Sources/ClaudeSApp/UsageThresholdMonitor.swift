@@ -1,5 +1,5 @@
 import AppKit
-import ClaudeSwitcherCore
+import ClaudeSCore
 import UserNotifications
 
 /// Warns via native notification when an account's usage crosses the same

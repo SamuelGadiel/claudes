@@ -69,7 +69,7 @@
 
 /* Expiry notifications */
 "Session expired: %@" = "Session expired: %@";
-"Open Claude Switcher and log in again to keep using this account." = "Open Claude Switcher and log in again to keep using this account.";
+"Open ClaudeS and log in again to keep using this account." = "Open ClaudeS and log in again to keep using this account.";
 "Session expiring soon: %@" = "Session expiring soon: %@";
 "Expires %@." = "Expires %@.";
 
@@ -77,7 +77,7 @@
 "Check for Updates" = "Check for Updates";
 "Reapply Patch to Claude Extension" = "Reapply Patch to Claude Extension";
 "Start at Login" = "Start at Login";
-"About Claude Switcher" = "About Claude Switcher";
+"About ClaudeS" = "About ClaudeS";
 "Test Expiry Notification" = "Test Expiry Notification";
 "Test notification" = "Test notification";
 "If you can see this, notifications are working correctly." = "If you can see this, notifications are working correctly.";
@@ -129,7 +129,7 @@
 
 /* Core error messages (LocalizableError.l10nKey), shown in the GUI only —
    the CLI renders the same keys directly in English, without going through
-   this table. Keep these in sync with Sources/ClaudeSwitcherCore. */
+   this table. Keep these in sync with Sources/ClaudeSCore. */
 "name cannot be empty" = "name cannot be empty";
 "could not generate a valid slug from the name" = "could not generate a valid slug from the name";
 "'%@' is a reserved command — choose another name or provide a slug" = "'%@' is a reserved command — choose another name or provide a slug";

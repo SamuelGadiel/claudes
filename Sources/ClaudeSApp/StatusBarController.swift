@@ -1,4 +1,4 @@
-import ClaudeSwitcherCore
+import ClaudeSCore
 import Cocoa
 import Combine
 import SwiftUI
@@ -28,7 +28,7 @@ final class StatusBarController: NSObject {
         if let button = statusItem.button {
             let image = NSImage(
                 systemSymbolName: "arrow.triangle.2.circlepath.circle",
-                accessibilityDescription: "Claude Switcher"
+                accessibilityDescription: "ClaudeS"
             )
             image?.isTemplate = true
             button.image = image
@@ -102,7 +102,7 @@ final class StatusBarController: NSObject {
             action: #selector(reapplyVSCodePatch), keyEquivalent: ""
         )
         let about = NSMenuItem(
-            title: String(localized: "About Claude Switcher", bundle: AppResources.bundle), action: #selector(showAbout), keyEquivalent: ""
+            title: String(localized: "About ClaudeS", bundle: AppResources.bundle), action: #selector(showAbout), keyEquivalent: ""
         )
         // Temporary debug item — lets the user validate the notification
         // pipeline (permission + delivery) on demand, without waiting for a

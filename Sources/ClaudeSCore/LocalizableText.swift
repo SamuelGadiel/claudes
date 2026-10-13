@@ -7,7 +7,7 @@ import Foundation
 ///
 /// The CLI never does that lookup: it has no dependency on any strings table
 /// and just renders `englishText`, so its output stays English-only with no
-/// runtime check anywhere. Only `ClaudeSwitcherApp` (the GUI) imports the
+/// runtime check anywhere. Only `ClaudeSApp` (the GUI) imports the
 /// helper that re-renders this in the user's language — see
 /// `LocalizableText.localizedForDisplay` there. That's the single place the
 /// "CLI vs. GUI" decision is made.

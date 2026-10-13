@@ -1,5 +1,5 @@
 import AppKit
-import ClaudeSwitcherCore
+import ClaudeSCore
 import UserNotifications
 
 /// Warns via native notification when an account has expired or is about to
@@ -121,7 +121,7 @@ final class ExpiryMonitor {
                     account.name
                 ),
                 body: String(
-                    localized: "Open Claude Switcher and log in again to keep using this account.",
+                    localized: "Open ClaudeS and log in again to keep using this account.",
                     bundle: AppResources.bundle
                 )
             )

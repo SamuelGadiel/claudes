@@ -17,8 +17,8 @@ o scope para `"window"` no `package.json` instalado.
 
 Diferente do problema abaixo (que exige reescrever código JS minificado via
 regex), esse é editar um campo de um JSON estático — **já implementado**:
-`VSCodeExtensionPatcher` (`Sources/ClaudeSwitcherCore`) e
-`VSCodeExtensionWatcher` (`Sources/ClaudeSwitcherApp`, reaplica sozinho via
+`VSCodeExtensionPatcher` (`Sources/ClaudeSCore`) e
+`VSCodeExtensionWatcher` (`Sources/ClaudeSApp`, reaplica sozinho via
 `DispatchSource` quando a extensão atualiza). Ver kanban para o resumo
 completo da investigação.
 

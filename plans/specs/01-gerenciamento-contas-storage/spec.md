@@ -50,13 +50,13 @@ explicitamente, então um sufixo órfão simplesmente não aparece na lista.
    passa a monitorar esse diretório depois.
 4. Persistir a lista de contas registradas (nome amigável ↔ `CLAUDE_CONFIG_DIR`)
    num arquivo de config do próprio app (ex. `~/Library/Application
-   Support/ClaudeSwitcher/accounts.json`), nunca em texto plano com segredo.
+   Support/ClaudeS/accounts.json`), nunca em texto plano com segredo.
 
 ## Leitura de Keychain — como
 
 Usar `Security.framework` (via Swift, `SecItemCopyMatching`) filtrando por
 `kSecAttrService`. A primeira leitura de cada item vai disparar o prompt
-nativo do macOS pedindo permissão ("ClaudeSwitcher quer acessar... "); é
+nativo do macOS pedindo permissão ("ClaudeS quer acessar... "); é
 esperado e deve ser comunicado ao usuário na primeira execução.
 
 ## Edge cases

@@ -1,4 +1,4 @@
-import ClaudeSwitcherCore
+import ClaudeSCore
 import Foundation
 
 /// Keeps the two patches of the official Claude Code extension (see

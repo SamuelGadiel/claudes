@@ -7,7 +7,7 @@ perfis duplicados do VS Code, extensão de terceiro para corrigir isolamento de
 credenciais, processo manual pra mover chat entre contas, e nenhuma visibilidade
 de uso/expiração. Ver histórico da conversa para o levantamento completo (13 pontos).
 
-## O que este projeto é
+## O que este projeto é (estado atual do MVP)
 
 Uma camada de **gerenciamento** sobre contas Claude Code já logadas:
 
@@ -15,15 +15,47 @@ Uma camada de **gerenciamento** sobre contas Claude Code já logadas:
 - Decide, por projeto aberto no VS Code, qual conta ele usa — sem precisar de profiles.
 - Corrige o bug da extensão oficial da Anthropic que ignora `CLAUDE_CONFIG_DIR`
   fora do processo de launch.
-- Sincroniza o histórico de chat de um projeto quando o usuário troca de conta nele.
+- Chats compartilhados entre contas via diretório único symlinkado (`~/.claude-shared-chats`)
+  — não é mais "sync on switch" (cópia pontual), ver `specs/04-sincronizacao-sessoes`.
 - Mostra uso e expiração de cada conta num ícone de status bar do macOS, com
-  troca de conta por projeto a partir dali.
+  troca de conta por projeto a partir dali, e notifica (expiração de login,
+  threshold de uso, renovação de cota) mesmo com o painel fechado.
 
-## O que este projeto NÃO é
+## O que este projeto NÃO é (hoje)
 
 - Não faz login nem gerencia OAuth. Só lê o que o Claude Code já gravou.
 - Não substitui o Claude Code CLI/extensão — opera ao lado deles.
 - Não é multi-plataforma nesta fase (macOS only, SwiftUI nativo).
+
+## Visão de longo prazo — por que o nome é "ClaudeS", não "Claude VS Code Switcher"
+
+O escopo do MVP é deliberadamente estreito (macOS + VS Code), mas a visão do
+projeto não é. Objetivo declarado: **em qualquer lugar que o Claude atue, este
+projeto deve poder atuar também** — o "S" de "ClaudeS" carrega tanto "plural"
+(múltiplas contas) quanto "mais do que só isso" (o ecossistema Claude como um
+todo, não só uma IDE).
+
+Direções futuras já levantadas (não compromissadas, não no MVP):
+
+- **Outros pontos de integração além da extensão VS Code**: Claude Desktop
+  (app Electron oficial — `kevinchau/claude-switcher`, ver Kanban, é referência
+  de como outro projeto já ataca esse domínio especificamente), extensão de
+  navegador para claude.ai, qualquer outra IDE que ganhe uma extensão oficial
+  Claude no futuro.
+- **Mais métricas, extraídas do que já coletamos**: custo de API (tokens
+  gastos) por projeto e por conta, volume de chats por projeto/conta, e outras
+  métricas derivadas dos dados de uso que o monitoramento já lê.
+- **Previsão/forecast de uso**: taxa de consumo atual projetada para estimar
+  quando uma janela vai esgotar — não só o threshold reativo (75%/90%) que já
+  existe, mas um alerta proativo ("nesse ritmo, acaba em X", "abra outra
+  sessão/conta agora"). Inspirado no sistema de forecast do
+  `kevinchau/claude-switcher` (ver Kanban), mas adaptado ao nosso modelo.
+- **Widgets nativos de macOS** mostrando uso sem abrir o painel.
+
+Isso molda decisões de nome/ícone/identidade visual desde já (não esperar o
+ecossistema crescer para só então ajustar a marca), mas não força nenhuma
+decisão de arquitetura prematura — cada direção acima vira trabalho real só
+quando entrar no backlog com detalhe.
 
 ## Decisões arquiteturais tomadas
 

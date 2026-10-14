@@ -47,11 +47,11 @@ public enum UsageControlClient {
         process.arguments = [
             "--input-format", "stream-json", "--output-format", "stream-json", "--verbose", "-p",
         ]
-        // Fixed to /tmp, same reasoning as CredentialRefresher: this is a
-        // background utility call made by the GUI app (not the user's
-        // interactive project session via `cs`), and `claude` touching
-        // ~/Desktop, ~/Documents, ~/Downloads etc. during startup triggers
-        // TCC prompts attributed to this app for each of those folders.
+        // Fixed to /tmp: this is a background utility call made by the GUI
+        // app (not the user's interactive project session via `cs`), and
+        // `claude` touching ~/Desktop, ~/Documents, ~/Downloads etc. during
+        // startup triggers TCC prompts attributed to this app for each of
+        // those folders.
         process.currentDirectoryURL = URL(fileURLWithPath: "/tmp")
 
         var env = ProcessInfo.processInfo.environment
@@ -106,8 +106,7 @@ public enum UsageControlClient {
         try? stdinPipe.fileHandleForWriting.close()
         if process.isRunning {
             // Terminate here is safe: this is a read (get_usage), not
-            // a credential renewal flow in the middle of a write —
-            // unlike CredentialRefresher, which never kills the process.
+            // a credential renewal flow in the middle of a write.
             // SIGTERM alone was observed not being enough: `claude` in this
             // mode can ignore it and keep running indefinitely (confirmed by
             // leaked zombie processes accumulating over repeated calls) —

@@ -27,8 +27,14 @@ mkdir -p "$APP_BUNDLE/Contents/MacOS"
 mkdir -p "$APP_BUNDLE/Contents/Resources"
 
 cp "$RELEASE_DIR/$EXECUTABLE_NAME" "$APP_BUNDLE/Contents/MacOS/$EXECUTABLE_NAME"
+# Bundled so the GUI app can install it into the user's PATH on first
+# launch (ShellInstall, called from AppDelegate) — without this, `cs`
+# install-cli` has nothing to point at until the user builds it separately.
+cp "$RELEASE_DIR/cs" "$APP_BUNDLE/Contents/MacOS/cs"
 cp Packaging/Info.plist "$APP_BUNDLE/Contents/Info.plist"
-cp Packaging/AppIcon.icns "$APP_BUNDLE/Contents/Resources/AppIcon.icns"
+# assets/ is the single source of truth for the icon — Packaging/ only
+# holds build-time metadata (Info.plist), not a second copy of artwork.
+cp assets/ClaudeS.icns "$APP_BUNDLE/Contents/Resources/AppIcon.icns"
 
 # The SwiftPM-generated Bundle.module accessor resolves resources relative
 # to the .app bundle's own root, not Contents/Resources — staging the

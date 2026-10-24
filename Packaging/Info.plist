@@ -12,13 +12,15 @@
     <string>ClaudeS</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
-    <!-- Both overwritten at build time by scripts/build-app.sh, from the
-         project's VERSION file — these are just a placeholder so the key
-         exists for plutil -replace to target. -->
+    <!-- The single source of truth for the app's version — bumped in
+         place by .github/workflows/release.yml (CFBundleShortVersionString
+         follows semver; CFBundleVersion is a separate build counter that
+         always increments by 1 and never resets, even across a major/minor
+         bump). -->
     <key>CFBundleShortVersionString</key>
-    <string>0.0.0</string>
+    <string>1.0.0</string>
     <key>CFBundleVersion</key>
-    <string>0</string>
+    <string>1</string>
     <key>CFBundleIconFile</key>
     <string>AppIcon</string>
     <!-- Required for automatic system-language resolution to work at all —

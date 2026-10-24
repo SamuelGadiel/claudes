@@ -20,22 +20,39 @@ jobs:
       tag: ${{ steps.bump.outputs.tag }}
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Configure git identity
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Bump version
+      - name: Bump Packaging/Info.plist and tag
         id: bump
         run: |
-          scripts/bump-version.sh "${{ inputs.increment }}"
-          full="$(cat VERSION)"
-          version="${full%+*}"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+          plist="Packaging/Info.plist"
+          current_short="$(plutil -extract CFBundleShortVersionString raw "$plist")"
+          current_build="$(plutil -extract CFBundleVersion raw "$plist")"
+
+          IFS='.' read -r major minor patch <<< "$current_short"
+          case "${{ inputs.increment }}" in
+            major) major=$((major + 1)); minor=0; patch=0 ;;
+            minor) minor=$((minor + 1)); patch=0 ;;
+            patch) patch=$((patch + 1)) ;;
+          esac
+          new_short="$major.$minor.$patch"
+          new_build=$((current_build + 1))
+
+          plutil -replace CFBundleShortVersionString -string "$new_short" "$plist"
+          plutil -replace CFBundleVersion -string "$new_build" "$plist"
+
+          git add "$plist"
+          git commit -m "Bump version to $new_short ($new_build)"
+          git tag "v$new_short"
+          git push
+          git push origin "v$new_short"
+
+          echo "version=$new_short" >> "$GITHUB_OUTPUT"
+          echo "tag=v$new_short" >> "$GITHUB_OUTPUT"
 
   build-and-release:
     needs: bump-version
@@ -60,14 +77,11 @@ jobs:
           echo "sha256=$sha256" >> "$GITHUB_OUTPUT"
 
       - name: Create GitHub Release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          tag="${{ needs.bump-version.outputs.tag }}"
-          gh release create "$tag" \
-            "dist/ClaudeS-${{ needs.bump-version.outputs.version }}.zip" \
-            --title "$tag" \
-            --generate-notes
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.bump-version.outputs.tag }}
+          files: dist/ClaudeS-${{ needs.bump-version.outputs.version }}.zip
+          generate_release_notes: true
 
   update-cask:
     needs: [bump-version, build-and-release]

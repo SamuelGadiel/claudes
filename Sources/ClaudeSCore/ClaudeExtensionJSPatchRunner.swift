@@ -24,6 +24,12 @@ public struct ClaudeExtensionJSPatchStatus {
     /// an update in progress (see `skippedReason`).
     public let changes: [String]
     public let skippedReason: String?
+    /// The state of each sub-patch *before* this call — nil only when we
+    /// skipped before ever analyzing the file. Combined with `changes`, this
+    /// is what lets a caller (e.g. `ClaudePatchCoordinator`) report each
+    /// sub-patch ("env", "clauderc"...) as its own already-applied/applied-now
+    /// outcome, without this type needing to know about that reporting shape.
+    public let analysisBeforePatch: ClaudeExtensionJSPatcher.Analysis?
 }
 
 /// I/O around `ClaudeExtensionJSPatcher` (the pure analysis/transform
@@ -33,9 +39,9 @@ public struct ClaudeExtensionJSPatchStatus {
 /// case of a transient lock. Same protections that
 /// `leog/claude-code-config-dir-patcher-vscode` uses (see ATTRIBUTIONS.md),
 /// adapted from callbacks/setTimeout to Swift Concurrency — see
-/// `TransientFileIO` (shared with `VSCodeExtensionPatcher`).
+/// `TransientFileIO` (shared with `VSCodeExtensionLocator`).
 public enum ClaudeExtensionJSPatchRunner {
-    private static let backupSuffix = ".claude-switcher-js-patch.bak"
+    private static let backupSuffix = ".claudes-js-patch.bak"
 
     @discardableResult
     public static func ensurePatched(extensionDir: String) async throws -> ClaudeExtensionJSPatchStatus {
@@ -44,14 +50,16 @@ public enum ClaudeExtensionJSPatchRunner {
 
         guard FileManager.default.fileExists(atPath: jsPath) else {
             return ClaudeExtensionJSPatchStatus(
-                extensionVersion: version, changes: [], skippedReason: "extension.js not found (update in progress?)"
+                extensionVersion: version, changes: [],
+                skippedReason: "extension.js not found (update in progress?)", analysisBeforePatch: nil
             )
         }
 
         var source = try await TransientFileIO.readWithRetry(path: jsPath)
         if source.isEmpty {
             return ClaudeExtensionJSPatchStatus(
-                extensionVersion: version, changes: [], skippedReason: "extension.js empty (update in progress)"
+                extensionVersion: version, changes: [],
+                skippedReason: "extension.js empty (update in progress)", analysisBeforePatch: nil
             )
         }
 
@@ -66,13 +74,15 @@ public enum ClaudeExtensionJSPatchRunner {
                 source = settled.source
                 if source.isEmpty {
                     return ClaudeExtensionJSPatchStatus(
-                        extensionVersion: version, changes: [], skippedReason: "extension.js empty (update in progress)"
+                        extensionVersion: version, changes: [],
+                        skippedReason: "extension.js empty (update in progress)", analysisBeforePatch: nil
                     )
                 }
                 status = ClaudeExtensionJSPatcher.analyze(source)
                 if !status.envPatched, !status.envPatchable {
                     return ClaudeExtensionJSPatchStatus(
-                        extensionVersion: version, changes: [], skippedReason: "file still unstable, try again later"
+                        extensionVersion: version, changes: [],
+                        skippedReason: "file still unstable, try again later", analysisBeforePatch: nil
                     )
                 }
             }
@@ -84,7 +94,9 @@ public enum ClaudeExtensionJSPatchRunner {
 
         let result = ClaudeExtensionJSPatcher.applyPatch(source)
         guard !result.changes.isEmpty else {
-            return ClaudeExtensionJSPatchStatus(extensionVersion: version, changes: [], skippedReason: nil)
+            return ClaudeExtensionJSPatchStatus(
+                extensionVersion: version, changes: [], skippedReason: nil, analysisBeforePatch: status
+            )
         }
 
         let backupPath = jsPath + backupSuffix
@@ -101,7 +113,9 @@ public enum ClaudeExtensionJSPatchRunner {
             throw ClaudeExtensionJSPatchError.writeFailed("\(error)")
         }
 
-        return ClaudeExtensionJSPatchStatus(extensionVersion: version, changes: result.changes, skippedReason: nil)
+        return ClaudeExtensionJSPatchStatus(
+            extensionVersion: version, changes: result.changes, skippedReason: nil, analysisBeforePatch: status
+        )
     }
 
     private static func extensionVersion(extensionDir: String) -> String {

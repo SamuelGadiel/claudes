@@ -26,12 +26,6 @@ struct AccountUsageState {
     var errorMessage: String?
 }
 
-struct AccountAuthInfo {
-    var email: String?
-    var orgName: String?
-    var subscriptionType: String?
-}
-
 @MainActor
 final class PanelViewModel: ObservableObject {
     @Published var accounts: [RegisteredAccount] = []
@@ -53,15 +47,16 @@ final class PanelViewModel: ObservableObject {
     /// While the user hasn't manually edited the slug, it tracks the
     /// typed name. Once edited by hand, it stops being overwritten.
     private var slugManuallyEdited = false
-    /// Read from the Keychain (local, fast) — used to know whether it's worth
-    /// trying to fetch usage. Without this, an account never logged in would make
-    /// UsageControlClient hang waiting for an interactive login flow that would
-    /// never arrive (process stuck until timeout).
-    @Published var accountStatuses: [String: AccountStatus] = [:]
-    /// Email/organization/plan — comes from `claude auth status`, not the
-    /// Keychain (which has no email). Loaded once per account (never
-    /// changes on its own), not repeated on every usage poll.
-    @Published var authInfoStates: [String: AccountAuthInfo] = [:]
+    /// Mirrors `AccountAuthMonitor.shared.states` — login state, email,
+    /// org, and plan, all from `claude auth status`, never the Keychain.
+    /// Used to know whether it's worth trying to fetch usage: without this,
+    /// an account never logged in would make UsageControlClient hang
+    /// waiting for an interactive login flow that would never arrive.
+    @Published var authStates: [String: AccountAuthMonitor.State] = [:]
+    /// Mirrors `ExpiryMonitor.shared.expiryDates` — the exact Keychain
+    /// expiry date, only ever populated while the opt-in "Show Login Expiry
+    /// Date" setting is on.
+    @Published var expiryDates: [String: Date] = [:]
     /// true while the login flow is active — during that period the popover
     /// should not close on its own (`claude auth login` opens the browser, which
     /// steals focus, and the end of login re-reads the Keychain, which may prompt
@@ -83,42 +78,33 @@ final class PanelViewModel: ObservableObject {
         let (file, _) = AccountsConfig.load()
         accounts = file.accounts
         defaultSlug = file.defaultAccountSlug
-        warmUpKeychain()
-    }
 
-    /// Reads the status (Keychain) of each registered account as soon as the app
-    /// opens, before any popover is on screen — a single read per
-    /// account, cached in `accountStatuses`. `refresh()` afterward never re-reads
-    /// the Keychain for an account already in this cache, only for a newly created one.
-    /// It then already triggers loading the usage of all accounts —
-    /// by the time the user clicks the icon, the data should already be
-    /// ready, without waiting for the popover to open to start fetching.
-    private func warmUpKeychain() {
-        Task.detached(priority: .utility) {
-            let (file, _) = AccountsConfig.load()
-            let statuses = file.accounts.reduce(into: [String: AccountStatus]()) { result, account in
-                result[account.slug] = AccountDiscovery.status(for: account)
-            }
-            await MainActor.run { [statuses] in
-                for (slug, status) in statuses where self.accountStatuses[slug] == nil {
-                    self.accountStatuses[slug] = status
-                }
-                self.loadUsageForAllAccounts()
-                self.loadAuthInfoForAllAccounts()
-            }
+        // Seed from whatever each monitor already knows (e.g. AppDelegate
+        // started them before this view model existed), then mirror every
+        // future change — a single PanelViewModel instance per app run, so
+        // a single observer registration each is enough.
+        authStates = AccountAuthMonitor.shared.states
+        expiryDates = ExpiryMonitor.shared.expiryDates
+        AccountAuthMonitor.shared.onUpdate = { [weak self] in
+            guard let self else { return }
+            self.authStates = AccountAuthMonitor.shared.states
+            // Newly-known login state (e.g. the hourly/background check just
+            // completed) may unblock usage for accounts that weren't ready
+            // to try yet.
+            self.loadUsageForAllAccounts()
+        }
+        ExpiryMonitor.shared.onUpdate = { [weak self] in
+            self?.expiryDates = ExpiryMonitor.shared.expiryDates
         }
     }
 
-    /// Re-reads the Keychain for a single account — used when we know its
-    /// status specifically may have changed (e.g. login just finished),
-    /// without re-querying all the others again. Also drops the cached
-    /// auth info (email/org/plan): `loadAuthInfo` only ever fetches it once
-    /// per account and otherwise never refreshes it, so a fresh login is the
-    /// one moment that cache actually needs invalidating.
+    /// Re-checks a single account right after we know its login state may
+    /// have changed (a login just finished) — without re-querying every
+    /// other account.
     func refreshStatus(slug: String) {
         guard let account = accounts.first(where: { $0.slug == slug }) else { return }
-        accountStatuses[slug] = AccountDiscovery.status(for: account)
-        authInfoStates[slug] = nil
+        AccountAuthMonitor.shared.checkNow(account)
+        ExpiryMonitor.shared.checkAccountImmediately(account)
     }
 
     private static let vscodeBundleIdentifiers: Set<String> = ["com.microsoft.VSCode", "com.microsoft.VSCodeInsiders"]
@@ -166,29 +152,21 @@ final class PanelViewModel: ObservableObject {
                 }?.name ?? String(localized: "unregistered account", bundle: AppResources.bundle)
                 return TerminalSessionInfo(pid: session.pid, cwd: cwd, accountLabel: label)
             }
-
-        // Only queries the Keychain for not-yet-cached (new) accounts —
-        // avoids re-reading already-known credentials on every refresh() and,
-        // with that, repeated authorization prompts.
-        for account in accounts where accountStatuses[account.slug] == nil {
-            accountStatuses[account.slug] = AccountDiscovery.status(for: account)
-        }
     }
 
     /// true for both "never logged in" and "expired" — anything that needs
-    /// the user to go through the login flow again. `accountStatuses[slug] ==
-    /// nil` (status not read yet) deliberately does NOT count as needing
-    /// login — only an actually-confirmed bad state does.
+    /// the user to go through the login flow again. `authStates[slug] == nil`
+    /// (not checked yet) deliberately does NOT count as needing login — only
+    /// an actually-confirmed bad state does.
     func needsLogin(slug: String) -> Bool {
-        guard let state = accountStatuses[slug]?.loginState else { return false }
-        return state != .loggedIn
+        guard let state = authStates[slug] else { return false }
+        return !state.loggedIn
     }
 
-    /// Distinguishes "has a credential, but the refresh token expired" from
-    /// "never logged in" — same underlying `needsLogin` gate, different
-    /// message/icon in the UI.
+    /// Distinguishes "was logged in, now isn't" from "never logged in" —
+    /// same underlying `needsLogin` gate, different message/icon in the UI.
     func isExpiredLogin(slug: String) -> Bool {
-        accountStatuses[slug]?.loginState == .expired
+        AccountAuthMonitor.shared.isExpiredLogin(slug: slug)
     }
 
     /// Labels a project row: the resolved account's name, qualified with
@@ -205,22 +183,18 @@ final class PanelViewModel: ObservableObject {
         )
     }
 
-    /// Switches the account of a project (.clauderc + .vscode/settings.json —
-    /// same flow as `cs set`). No session sync needed anymore: every
-    /// account's `projects/` is the same shared directory (see
-    /// SharedSessionsDirectory), so chat history is already there no matter
-    /// which account ends up active.
+    /// Switches the account of a project (.clauderc only — same flow as
+    /// `cs set`; see specs/02 for why this stopped also writing
+    /// .vscode/settings.json). No session sync needed: every account's
+    /// `projects/` is the same shared directory (see SharedSessionsDirectory),
+    /// so chat history is already there no matter which account ends up active.
     func switchAccount(project: ProjectInfo, to newAccount: RegisteredAccount) {
         do {
-            try ClauderFile.write(accountSlug: newAccount.slug, inDir: project.path)
-            let result = try VSCodeSettings.setConfigDir(projectPath: project.path, configDir: newAccount.configDir)
+            try ClauderFile.write(account: newAccount, inDir: project.path)
             statusMessage = String(
                 format: NSLocalizedString("%@ now uses %@", bundle: AppResources.bundle, comment: ""),
                 project.name, newAccount.name
             )
-            for warning in result.warnings {
-                statusMessage? += " — \(warning.localizedForDisplay)"
-            }
         } catch {
             statusMessage = String(
                 format: NSLocalizedString("Error switching %@: %@", bundle: AppResources.bundle, comment: ""),
@@ -255,7 +229,7 @@ final class PanelViewModel: ObservableObject {
     /// claude/cs is run there. See plans/specs/05-app-status-bar.
     func switchTerminalSessionAccount(session: TerminalSessionInfo, to newAccount: RegisteredAccount) {
         do {
-            try ClauderFile.write(accountSlug: newAccount.slug, inDir: session.cwd)
+            try ClauderFile.write(account: newAccount, inDir: session.cwd)
             statusMessage = String(
                 format: NSLocalizedString(
                     "%@ will use %@ on the next run (the current session, pid %d, keeps the old account)",
@@ -341,14 +315,15 @@ final class PanelViewModel: ObservableObject {
             slugManuallyEdited = false
             addAccountError = nil
             importedConfigDir = nil
-            // An imported account may already have a real credential —
-            // unlike a brand-new one, don't assume "not logged in".
-            accountStatuses[account.slug] = AccountDiscovery.status(for: account)
-            // A freshly created account can't possibly already be expired
-            // (it has no credential yet) — only worth checking for an
-            // imported one, which may carry a credential that's already bad.
             if wasImporting {
+                // An imported account may already have a real credential —
+                // unlike a brand-new one, don't assume "not logged in".
+                AccountAuthMonitor.shared.checkNow(account)
                 ExpiryMonitor.shared.checkAccountImmediately(account)
+            } else {
+                // A freshly created account can't possibly be logged in yet
+                // (no credential exists) — known in advance, no need to ask.
+                AccountAuthMonitor.shared.markNeverLoggedIn(slug: account.slug)
             }
             refresh()
             selectAccount(account.slug)
@@ -381,7 +356,8 @@ final class PanelViewModel: ObservableObject {
             try AccountsConfig.removeAccount(slug: account.slug)
             let wasSelected = selectedAccountSlug == account.slug
             usageStates[account.slug] = nil
-            accountStatuses[account.slug] = nil
+            AccountAuthMonitor.shared.remove(slug: account.slug)
+            ExpiryMonitor.shared.remove(slug: account.slug)
             refresh()
             // The displayed tab always falls back to the first remaining account
             // (see `selectedAccount` in the View) — without explicitly re-selecting
@@ -445,42 +421,22 @@ final class PanelViewModel: ObservableObject {
         if selectedAccountSlug == nil {
             selectedAccountSlug = accounts.first?.slug
         }
-        // Always reloads all accounts when the panel opens — before it only
-        // reloaded the selected tab, and only if the user switched tabs
+        // Rechecks every account's login state (even ones already known to
+        // be logged out — covers a login done outside this app, e.g. a
+        // terminal) and resets each one's hourly background clock from now.
+        // Internally debounced, so reopening the popover rapidly doesn't
+        // re-spawn `claude` on every click.
+        AccountAuthMonitor.shared.checkAllOnPanelOpen()
+        // Always reloads all accounts' usage when the panel opens — before it
+        // only reloaded the selected tab, and only if the user switched tabs
         // (selectAccount), never when simply reopening the popover.
         loadUsageForAllAccounts()
-        loadAuthInfoForAllAccounts()
         startPolling()
     }
 
     func loadUsageForAllAccounts() {
         for account in accounts where !needsLogin(slug: account.slug) {
             loadUsage(slug: account.slug)
-        }
-    }
-
-    func loadAuthInfoForAllAccounts() {
-        for account in accounts where !needsLogin(slug: account.slug) {
-            loadAuthInfo(slug: account.slug)
-        }
-    }
-
-    /// Email/plan don't change on their own — loaded once per account and
-    /// cached, never repeated on every usage poll. `refreshStatus`/a successful
-    /// login invalidate the cache when it may actually have changed.
-    func loadAuthInfo(slug: String) {
-        guard authInfoStates[slug] == nil else { return }
-        guard let account = accounts.first(where: { $0.slug == slug }) else { return }
-        let configDir = account.configDir
-
-        Task {
-            let status = await Task.detached(priority: .utility) {
-                try? ClaudeAuthStatusClient.fetch(configDir: configDir)
-            }.value
-            guard let status else { return }
-            authInfoStates[slug] = AccountAuthInfo(
-                email: status.email, orgName: status.orgName, subscriptionType: status.subscriptionType
-            )
         }
     }
 
@@ -561,7 +517,6 @@ struct PanelView: View {
         if let slug = viewModel.selectedAccountSlug {
             viewModel.refreshStatus(slug: slug)
             viewModel.loadUsage(slug: slug)
-            viewModel.loadAuthInfo(slug: slug)
         }
     }
 
@@ -794,7 +749,7 @@ struct PanelView: View {
         let slug = viewModel.selectedAccountSlug ?? ""
         if !viewModel.needsLogin(slug: slug) {
             VStack(alignment: .leading, spacing: 2) {
-                if let info = viewModel.authInfoStates[slug] {
+                if let info = viewModel.authStates[slug] {
                     HStack(alignment: .firstTextBaseline) {
                         if let email = info.email {
                             Text(email)
@@ -814,7 +769,9 @@ struct PanelView: View {
                         }
                     }
                 }
-                if let expiresAt = viewModel.accountStatuses[slug]?.refreshTokenExpiresAt {
+                // Only ever populated while the opt-in "Show Login Expiry
+                // Date" setting is on — see ExpiryMonitor.
+                if let expiresAt = viewModel.expiryDates[slug] {
                     Text(String(
                         format: NSLocalizedString("Login expires %@", bundle: AppResources.bundle, comment: ""),
                         expiresAt.formatted(.relative(presentation: .named))
@@ -823,9 +780,31 @@ struct PanelView: View {
                     .foregroundStyle(.secondary)
                 }
             }
-            if viewModel.authInfoStates[slug] != nil || viewModel.accountStatuses[slug]?.refreshTokenExpiresAt != nil {
+            if viewModel.authStates[slug] != nil || viewModel.expiryDates[slug] != nil {
                 Divider()
             }
+        }
+    }
+
+    /// Shared by every "this account needs a fresh login" state — including
+    /// the edge case where we believed the account was logged in but
+    /// `get_usage` came back empty anyway. Always the same action: start the
+    /// same login flow the "Log In" button elsewhere in the panel uses.
+    @ViewBuilder
+    private func loginPrompt<Message: View>(slug: String, @ViewBuilder message: () -> Message) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            message()
+            Button {
+                if let account = viewModel.accounts.first(where: { $0.slug == slug }) {
+                    viewModel.keepPopoverOpen = true
+                    loginSession.start(configDir: account.configDir)
+                }
+            } label: {
+                Text("Log In", bundle: AppResources.bundle)
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(.accentColor)
         }
     }
 
@@ -837,7 +816,7 @@ struct PanelView: View {
         accountIdentityHeader
 
         if viewModel.needsLogin(slug: slug) {
-            VStack(alignment: .leading, spacing: 6) {
+            loginPrompt(slug: slug) {
                 if viewModel.isExpiredLogin(slug: slug) {
                     Text("Session expired — log in again to keep using this account.", bundle: AppResources.bundle)
                         .font(.caption)
@@ -847,20 +826,24 @@ struct PanelView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-                Button {
-                    if let account = viewModel.accounts.first(where: { $0.slug == slug }) {
-                        viewModel.keepPopoverOpen = true
-                        loginSession.start(configDir: account.configDir)
-                    }
-                } label: {
-                    Text("Log In", bundle: AppResources.bundle)
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(.accentColor)
             }
         } else if state?.isLoading == true, state?.response == nil {
             ProgressView().controlSize(.small)
+        } else if let response = state?.response, response.fiveHour == nil, response.sevenDay == nil {
+            // `claude get_usage` answered successfully but reported no rate
+            // limit data at all, despite us believing this account is logged
+            // in (seen for a Team account: the CLI returned
+            // `rate_limits_available: false`). A fresh login is the same fix
+            // VS Code itself offers here — a plain retry would just repeat
+            // the same empty answer.
+            loginPrompt(slug: slug) {
+                Text(
+                    "This account's usage isn't available right now. Try logging in again.",
+                    bundle: AppResources.bundle
+                )
+                .font(.caption)
+                .foregroundStyle(.orange)
+            }
         } else if let response = state?.response {
             // .id(slug) forces SwiftUI to recreate (not just update) these
             // bars when switching tabs — resets their animation @State,
@@ -894,6 +877,24 @@ struct PanelView: View {
                     viewModel.loadUsage(slug: slug)
                 } label: {
                     Text("Try Again", bundle: AppResources.bundle)
+                }
+                .font(.caption)
+            }
+        } else {
+            // `state` is nil — usage was never fetched for this account in
+            // this app run (e.g. it was skipped while the login status was
+            // still being resolved). Without this branch the panel silently
+            // shows nothing here, indistinguishable from a successful "no
+            // usage to report", with no way to tell the user or let them
+            // retry.
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Usage not checked yet.", bundle: AppResources.bundle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Button {
+                    viewModel.loadUsage(slug: slug)
+                } label: {
+                    Text("Check Now", bundle: AppResources.bundle)
                 }
                 .font(.caption)
             }

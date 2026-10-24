@@ -177,16 +177,26 @@ public final class DisclaimedProcess {
         isRunning = false
     }
 
-    /// Resolved via `dlsym` (not linked directly) because this is a
-    /// private API, absent from public SDK headers — silently does
-    /// nothing on a system where it's unavailable, rather than failing to
-    /// launch the process at all over a best-effort privacy improvement.
-    private static func disclaimResponsibility(_ attr: inout posix_spawnattr_t?) {
-        typealias SetdisclaimFn = @convention(c) (UnsafeMutablePointer<posix_spawnattr_t?>, Int32) -> Int32
+    private typealias SetdisclaimFn = @convention(c) (UnsafeMutablePointer<posix_spawnattr_t?>, Int32) -> Int32
+
+    /// Resolved via `dlsym` (not linked directly) because this is a private
+    /// API, absent from public SDK headers. `static let` so the lookup only
+    /// ever happens once (Swift guarantees thread-safe, one-time
+    /// initialization) — multiple `DisclaimedProcess.run()` calls racing on
+    /// `dlsym` from different threads (e.g. several accounts checked in
+    /// parallel) crashed the dyld loader (SIGSEGV inside
+    /// `dyld4::RuntimeLocks::withLoadersReadLock`), confirmed via a real
+    /// crash report. nil on a system where the symbol is unavailable,
+    /// handled as a best-effort privacy improvement, not a hard requirement.
+    private static let disclaimFn: SetdisclaimFn? = {
         guard let symbol = dlsym(UnsafeMutableRawPointer(bitPattern: -2), "responsibility_spawnattrs_setdisclaim") else {
-            return
+            return nil
         }
-        let fn = unsafeBitCast(symbol, to: SetdisclaimFn.self)
-        _ = fn(&attr, 1)
+        return unsafeBitCast(symbol, to: SetdisclaimFn.self)
+    }()
+
+    private static func disclaimResponsibility(_ attr: inout posix_spawnattr_t?) {
+        guard let disclaimFn else { return }
+        _ = disclaimFn(&attr, 1)
     }
 }

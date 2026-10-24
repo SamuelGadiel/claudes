@@ -20,16 +20,20 @@ final class StatusBarController: NSObject {
     private let launchAtLoginItem = NSMenuItem(
         title: String(localized: "Start at Login", bundle: AppResources.bundle), action: #selector(toggleLaunchAtLogin), keyEquivalent: ""
     )
+    /// Opt-in: off by default, this is the only thing in the app that still
+    /// reads the Keychain directly (see ExpiryMonitor). Backlog: a real
+    /// Preferences window — for now this lives in the right-click menu.
+    private let showLoginExpiryItem = NSMenuItem(
+        title: String(localized: "Show Login Expiry Date", bundle: AppResources.bundle),
+        action: #selector(toggleShowLoginExpiry), keyEquivalent: ""
+    )
 
     override init() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         super.init()
 
         if let button = statusItem.button {
-            let image = NSImage(
-                systemSymbolName: "arrow.triangle.2.circlepath.circle",
-                accessibilityDescription: "ClaudeS"
-            )
+            let image = StatusBarController.loadStatusBarIcon()
             image?.isTemplate = true
             button.image = image
             button.target = self
@@ -62,6 +66,26 @@ final class StatusBarController: NSObject {
         popover.delegate = self
         rightClickMenu.delegate = self
         setUpRightClickMenu()
+    }
+
+    /// `StatusBarIcon.png` is pre-cropped to the artwork's actual opaque
+    /// bounds (the source template PNG had a lot of transparent padding —
+    /// the chat bubbles only filled ~78%x61% of its square canvas — which
+    /// made the icon render noticeably smaller than its neighbors in the
+    /// menu bar). There's no asset catalog here (plain SwiftPM resource),
+    /// so retina density comes from the source pixels, not a @2x naming
+    /// convention: we fix the displayed *height* to the menu bar's
+    /// conventional 16pt and derive width from the cropped image's own
+    /// aspect ratio, instead of forcing a square that would squash it.
+    private static func loadStatusBarIcon() -> NSImage? {
+        guard let url = AppResources.bundle.url(forResource: "StatusBarIcon", withExtension: "png"),
+              let image = NSImage(contentsOf: url),
+              let rep = image.representations.first
+        else { return nil }
+        let targetHeight: CGFloat = 16
+        let aspect = CGFloat(rep.pixelsWide) / CGFloat(rep.pixelsHigh)
+        image.size = NSSize(width: targetHeight * aspect, height: targetHeight)
+        return image
     }
 
     @objc private func statusItemClicked(_ sender: NSStatusBarButton) {
@@ -104,28 +128,19 @@ final class StatusBarController: NSObject {
         let about = NSMenuItem(
             title: String(localized: "About ClaudeS", bundle: AppResources.bundle), action: #selector(showAbout), keyEquivalent: ""
         )
-        // Temporary debug item — lets the user validate the notification
-        // pipeline (permission + delivery) on demand, without waiting for a
-        // real account's refresh token to expire. Remove once P9
-        // (specs/05-app-status-bar) is confirmed working end to end.
-        let testNotification = NSMenuItem(
-            title: String(localized: "Test Expiry Notification", bundle: AppResources.bundle),
-            action: #selector(sendTestNotification), keyEquivalent: ""
-        )
         let quit = NSMenuItem(
             title: String(localized: "Quit", bundle: AppResources.bundle), action: #selector(quit), keyEquivalent: "q"
         )
 
-        for item in [checkUpdates, reapplyVSCodePatch, launchAtLoginItem, about, testNotification, quit] {
+        for item in [checkUpdates, reapplyVSCodePatch, launchAtLoginItem, showLoginExpiryItem, about, quit] {
             item.target = self
         }
 
         rightClickMenu.addItem(checkUpdates)
         rightClickMenu.addItem(reapplyVSCodePatch)
         rightClickMenu.addItem(launchAtLoginItem)
+        rightClickMenu.addItem(showLoginExpiryItem)
         rightClickMenu.addItem(about)
-        rightClickMenu.addItem(.separator())
-        rightClickMenu.addItem(testNotification)
         rightClickMenu.addItem(.separator())
         rightClickMenu.addItem(quit)
     }
@@ -191,59 +206,43 @@ final class StatusBarController: NSObject {
                 editorVersion
             ))
         }
-        if let extensionVersion = entry.scope.extensionVersion {
+        if let extensionVersion = entry.extensionVersion {
             lines.append(String(
                 format: NSLocalizedString("Extension version: %@", bundle: AppResources.bundle, comment: ""),
                 extensionVersion
             ))
         }
 
-        let scopeText: String
-        switch entry.scope {
-        case .alreadyApplied: scopeText = String(localized: "already applied", bundle: AppResources.bundle)
-        case .appliedNow: scopeText = String(localized: "applied now", bundle: AppResources.bundle)
-        case .skipped(let reason):
-            scopeText = String(
-                format: NSLocalizedString("skipped (%@)", bundle: AppResources.bundle, comment: ""), reason
-            )
-        case .error(let detail):
-            scopeText = String(
-                format: NSLocalizedString("error — %@", bundle: AppResources.bundle, comment: ""), detail
-            )
-        }
-        let scopeLabel = String(localized: "Scope setting:", bundle: AppResources.bundle)
-
-        let jsText: String
-        switch entry.js {
-        case .alreadyPatched: jsText = String(localized: "already patched", bundle: AppResources.bundle)
-        case .patchedNow(let changes):
-            jsText = String(
-                format: NSLocalizedString("patched now (%@)", bundle: AppResources.bundle, comment: ""),
-                changes.joined(separator: ", ")
-            )
-        case .skipped(let reason):
-            jsText = String(
-                format: NSLocalizedString("js skipped (%@)", bundle: AppResources.bundle, comment: ""), reason
-            )
-        case .error(let detail):
-            jsText = String(
-                format: NSLocalizedString("js error — %@", bundle: AppResources.bundle, comment: ""), detail
-            )
-        }
-
         lines.append("")
-        lines.append("\(scopeLabel) \(scopeText)")
-        lines.append("extension.js: \(jsText)")
+        lines.append(String(
+            format: NSLocalizedString(".clauderc check: %@", bundle: AppResources.bundle, comment: ""),
+            Self.localizedOutcome(entry.clauderc)
+        ))
+        lines.append(String(
+            format: NSLocalizedString("Env propagation fix: %@", bundle: AppResources.bundle, comment: ""),
+            Self.localizedOutcome(entry.env)
+        ))
 
         return lines.joined(separator: "\n")
+    }
+
+    private static func localizedOutcome(_ outcome: ClaudePatchCoordinator.SubPatchOutcome) -> String {
+        switch outcome {
+        case .alreadyApplied: return String(localized: "already applied", bundle: AppResources.bundle)
+        case .appliedNow: return String(localized: "applied now", bundle: AppResources.bundle)
+        case .skipped(let reason):
+            return String(format: NSLocalizedString("skipped (%@)", bundle: AppResources.bundle, comment: ""), reason)
+        case .error(let detail):
+            return String(format: NSLocalizedString("error — %@", bundle: AppResources.bundle, comment: ""), detail)
+        }
     }
 
     @objc private func showAbout() {
         NSApp.orderFrontStandardAboutPanel(nil)
     }
 
-    @objc private func sendTestNotification() {
-        ExpiryMonitor.shared.sendTestNotification()
+    @objc private func toggleShowLoginExpiry() {
+        ExpiryMonitor.shared.setEnabled(!ExpiryMonitor.shared.isEnabled)
     }
 
     @objc private func quit() {
@@ -273,5 +272,6 @@ extension StatusBarController: NSMenuDelegate {
     /// panel, outside our control).
     func menuWillOpen(_ menu: NSMenu) {
         launchAtLoginItem.state = LaunchAtLoginManager.isEnabled ? .on : .off
+        showLoginExpiryItem.state = ExpiryMonitor.shared.isEnabled ? .on : .off
     }
 }

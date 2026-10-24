@@ -29,17 +29,3 @@ extension LocalizableText {
 /// directly from `englishText`, so there's exactly one place per error type
 /// that spells out the English copy.
 public protocol LocalizableError: Error, LocalizableText {}
-
-/// A non-fatal, user-facing warning (not an `Error`) surfaced by Core
-/// operations — e.g. GitRisk's ".gitignore" checks or JSONSettingsFile's
-/// "comments will be lost" notice. Same key+args contract as
-/// `LocalizableError`, just without the `Error` conformance.
-public struct LocalizedWarning: LocalizableText {
-    public let l10nKey: String
-    public let l10nArgs: [CVarArg]
-
-    public init(l10nKey: String, l10nArgs: [CVarArg] = []) {
-        self.l10nKey = l10nKey
-        self.l10nArgs = l10nArgs
-    }
-}

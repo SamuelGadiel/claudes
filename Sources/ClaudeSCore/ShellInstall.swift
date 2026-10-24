@@ -1,11 +1,15 @@
 import Foundation
 
-/// Installs (or updates) a symbolic link to the running `cs` binary
-/// inside a directory that is already in the user's PATH — the same pattern
-/// as VS Code's "Shell Command: Install 'code' in PATH", or Docker Desktop's
-/// "docker". Reusable both by the CLI itself (`cs install-cli`) and
-/// by the future status bar GUI on first launch — neither does
-/// more than this; there's no IPC or dependency between the two binaries.
+/// Installs (or updates) a symbolic link to the `cs` binary inside a
+/// directory that is already in the user's PATH — the same pattern as VS
+/// Code's "Shell Command: Install 'code' in PATH", or Docker Desktop's
+/// "docker". Called automatically by ClaudeSApp (AppDelegate) on every
+/// launch, pointed at the `cs` binary bundled inside it — not exposed as a
+/// `cs` subcommand: an end user installs the app, never types a CLI command
+/// to make the CLI itself appear. A contributor building `cs` standalone
+/// from source — never opening the .app — does this manually instead
+/// (symlink it themselves, or build and open the .app once via
+/// scripts/build-app.sh, which installs it the same way an end user's copy does).
 public enum ShellInstallError: Error, CustomStringConvertible {
     case noWritableDirectory([String])
 
@@ -53,9 +57,13 @@ public enum ShellInstall {
         return (absolute as NSString).resolvingSymlinksInPath
     }
 
+    /// `target` defaults to the currently running binary (`cs install-cli`,
+    /// pointing the link at itself). The GUI app passes its own bundled
+    /// `cs` binary explicitly instead — `currentExecutablePath()` would
+    /// otherwise resolve to the GUI binary itself, not the CLI.
     @discardableResult
-    public static func install() throws -> ShellInstallResult {
-        let target = currentExecutablePath()
+    public static func install(target explicitTarget: String? = nil) throws -> ShellInstallResult {
+        let target = explicitTarget ?? currentExecutablePath()
         let fm = FileManager.default
 
         for dir in candidateDirs {

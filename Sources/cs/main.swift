@@ -3,19 +3,48 @@ import Foundation
 
 func printUsage() {
     print("""
-    Usage:
-      cs                                     runs claude with the current project's account (or the default one)
-      cs <slug> [args...]                    runs claude with that account, passing along args (e.g.: cs work auth login)
-      cs list                                lists registered accounts and expiration status
-      cs add --name <name> [--dir <path>] [--slug <slug>] [--default]
-      cs remove <slug>                       removes from the registry (doesn't delete the folder)
-      cs set <slug>                          sets this project's account (.clauderc + .vscode/settings.json)
-      cs default <slug>                      sets the account used when the project has no .clauderc
-      cs install-cli                         installs/updates the 'cs' link in a PATH directory
-      cs status                              lists open VS Code projects and running terminal sessions, with each one's account
+    Usage: cs [command] [options]
 
-    Legacy (spec 02, still works):
-      cs set-account <project> <account>
+    Running claude
+      cs
+          Runs claude with the current project's account (or the default one).
+
+      cs <slug> [args...]
+          Runs claude with that account, passing the rest of the args through.
+          Example: cs work auth login
+
+    Accounts
+      cs list [--expiry]
+          Lists registered accounts and login status, via 'claude auth status'.
+          --expiry also reads the Keychain for the exact login expiry date —
+          opt-in, since it's the only thing here that can trigger a macOS
+          Keychain password prompt.
+
+      cs add --name <name> [--slug <slug>] [--default]
+          Registers a brand-new account (fresh, empty CLAUDE_CONFIG_DIR).
+
+      cs import --dir <path> --name <name> [--slug <slug>] [--default]
+          Registers an existing CLAUDE_CONFIG_DIR (e.g. set up before this tool).
+
+      cs remove <slug>
+          Deletes the registry entry, the CLAUDE_CONFIG_DIR folder, and the
+          Keychain credential. Asks for confirmation — cannot be undone.
+
+      cs default <slug>
+          Sets the account used when a project has no .clauderc.
+
+    Projects & sessions
+      cs set <slug>
+          Sets this project's account (.clauderc + .vscode/settings.json).
+
+      cs status
+          Lists open VS Code projects and running terminal sessions, with
+          each one's account.
+
+    Usage
+      cs usage [slug]
+          Shows the account's current rate-limit usage (5h/week windows).
+          With no slug, shows every registered account, one after another.
     """)
 }
 
@@ -38,7 +67,13 @@ func loadAccountsPrintingMessages() -> AccountsFile {
     return file
 }
 
-func runList() {
+/// Login state and email/org/plan come from `claude auth status` — never
+/// the Keychain directly, same as the GUI app's AccountAuthMonitor. The
+/// exact refresh-token expiry date is the one thing only the Keychain has;
+/// showing it is opt-in (`--expiry`), because reading it directly is the
+/// one thing in this CLI that can resurface the macOS Keychain password
+/// prompt — see plans/research/keychain-bypass-blocked-by-policy.md.
+func runList(showExpiry: Bool) {
     let file = loadAccountsPrintingMessages()
     if file.accounts.isEmpty {
         print("No accounts registered yet. Use 'cs add --name <name>'.")
@@ -46,34 +81,35 @@ func runList() {
     }
 
     for account in file.accounts {
-        let status = AccountDiscovery.status(for: account)
         let defaultMarker = file.defaultAccountSlug == account.slug ? " [default]" : ""
-        print("— \(status.name) (\(account.slug))\(defaultMarker) — \(status.configDir)")
-        print("   keychain service: \(status.keychainService)")
+        print("— \(account.name) (\(account.slug))\(defaultMarker) — \(account.configDir)")
 
-        if let error = status.error {
-            print("   status: \(error)")
+        if let authStatus = try? ClaudeAuthStatusClient.fetch(configDir: account.configDir), authStatus.loggedIn {
+            if let email = authStatus.email { print("   \(email)") }
+            if let plan = authStatus.subscriptionType { print("   plan: \(plan)") }
         } else {
-            if let expiresAt = status.expiresAt {
-                print("   access token expires on: \(dateFormatter.string(from: expiresAt)) (renews itself, ok)")
-            }
-            if let refreshExpiresAt = status.refreshTokenExpiresAt {
+            print("   not logged in — run: cs \(account.slug) auth login")
+        }
+
+        if showExpiry {
+            let status = AccountDiscovery.status(for: account)
+            if let error = status.error {
+                print("   keychain: \(error)")
+            } else if let refreshExpiresAt = status.refreshTokenExpiresAt {
                 let expired = refreshExpiresAt < Date()
                 let marker = expired ? " [NEEDS LOGIN AGAIN]" : ""
                 print("   refresh token expires on: \(dateFormatter.string(from: refreshExpiresAt))\(marker)")
-            }
-            if let subscriptionType = status.subscriptionType {
-                print("   plan: \(subscriptionType)")
-            }
-            if let rateLimitTier = status.rateLimitTier {
-                print("   rate limit tier: \(rateLimitTier)")
             }
         }
         print("")
     }
 }
 
-func runAdd(args: [String]) {
+/// Shared by `cs add` and `cs import` — same backend (`AccountsConfig.addAccount`),
+/// same parsing shape (`--name`/`--slug`/`--default`, plus `--dir` only for
+/// import), same as the GUI's "Add Account…"/"Import Existing Account…" split
+/// in the "..." menu, which already calls the same Core function either way.
+private func parseAccountArgs(_ args: [String], allowDir: Bool) -> (name: String?, dir: String?, slug: String?, markDefault: Bool) {
     var name: String?
     var dir: String?
     var slugOverride: String?
@@ -86,7 +122,7 @@ func runAdd(args: [String]) {
             i += 1
             guard i < args.count else { print("missing value for --name"); exit(1) }
             name = args[i]
-        case "--dir":
+        case "--dir" where allowDir:
             i += 1
             guard i < args.count else { print("missing value for --dir"); exit(1) }
             dir = args[i]
@@ -102,12 +138,12 @@ func runAdd(args: [String]) {
         }
         i += 1
     }
+    return (name, dir, slugOverride, markDefault)
+}
 
-    guard let name, !name.isEmpty else {
-        print("Usage: cs add --name <name> [--dir <path>] [--slug <slug>] [--default]")
-        exit(1)
-    }
-
+/// Registers the account (new directory or, when `dir` is set, an existing
+/// one) and, for a genuinely new directory, offers to log in right away.
+private func registerAccount(name: String, dir: String?, slugOverride: String?, markDefault: Bool) {
     let account: RegisteredAccount
     do {
         account = try AccountsConfig.addAccount(
@@ -124,6 +160,14 @@ func runAdd(args: [String]) {
         print("Set as the default account.")
     }
 
+    // An imported directory may already carry a valid credential — unlike a
+    // brand-new one, don't assume it needs a login. Same check the GUI app
+    // does right after importing.
+    if dir != nil, let authStatus = try? ClaudeAuthStatusClient.fetch(configDir: account.configDir), authStatus.loggedIn {
+        print("Already logged in" + (authStatus.email.map { " as \($0)" } ?? "") + ".")
+        return
+    }
+
     print("\nLog in to this account now? [y/N] ", terminator: "")
     let answer = readLine()?.lowercased() ?? ""
     if answer == "y" || answer == "yes" {
@@ -134,6 +178,28 @@ func runAdd(args: [String]) {
     } else {
         print("Ok. When you want to log in: cs \(account.slug) auth login")
     }
+}
+
+func runAdd(args: [String]) {
+    let parsed = parseAccountArgs(args, allowDir: false)
+    guard let name = parsed.name, !name.isEmpty else {
+        print("Usage: cs add --name <name> [--slug <slug>] [--default]")
+        exit(1)
+    }
+    registerAccount(name: name, dir: nil, slugOverride: parsed.slug, markDefault: parsed.markDefault)
+}
+
+func runImport(args: [String]) {
+    let parsed = parseAccountArgs(args, allowDir: true)
+    guard let dir = parsed.dir, !dir.isEmpty else {
+        print("Usage: cs import --dir <path> --name <name> [--slug <slug>] [--default]")
+        exit(1)
+    }
+    guard let name = parsed.name, !name.isEmpty else {
+        print("Usage: cs import --dir <path> --name <name> [--slug <slug>] [--default]")
+        exit(1)
+    }
+    registerAccount(name: name, dir: dir, slugOverride: parsed.slug, markDefault: parsed.markDefault)
 }
 
 func runRemove(args: [String]) {
@@ -194,20 +260,11 @@ func runSet(args: [String]) {
     let cwd = FileManager.default.currentDirectoryPath
 
     do {
-        try ClauderFile.write(accountSlug: account.slug, inDir: cwd)
+        try ClauderFile.write(account: account, inDir: cwd)
         print("OK: \(cwd)/.clauderc now uses account '\(account.name)' (\(account.slug)).")
     } catch {
         print("Error writing .clauderc: \(error)")
         exit(1)
-    }
-
-    do {
-        let result = try VSCodeSettings.setConfigDir(projectPath: cwd, configDir: account.configDir)
-        for warning in result.warnings {
-            print("\n\(warning.englishText)")
-        }
-    } catch {
-        print("\nWarning: could not update .vscode/settings.json: \(error)")
     }
 }
 
@@ -266,75 +323,88 @@ func runStatus() {
     }
 }
 
+/// `cs usage` with no slug fetches every registered account's usage in
+/// parallel — one `claude` subprocess per account, running concurrently
+/// instead of one after another, so the wait is ~one account's worth, not
+/// N. `usageLines(for:)` only ever computes and returns strings, never
+/// prints — printing happens here, strictly after every fetch has finished,
+/// all from this one thread. Concurrent `print()` calls from the worker
+/// threads would interleave mid-line; this sidesteps that entirely instead
+/// of trying to synchronize around it.
 func runUsage(args: [String]) {
+    let file = loadAccountsPrintingMessages()
+
     guard let identifier = args.first else {
-        print("Usage: cs usage <slug>")
-        exit(1)
+        guard !file.accounts.isEmpty else {
+            print("No accounts registered yet. Use 'cs add --name <name>'.")
+            return
+        }
+
+        var results = [[String]](repeating: [], count: file.accounts.count)
+        let group = DispatchGroup()
+        for (index, account) in file.accounts.enumerated() {
+            group.enter()
+            DispatchQueue.global(qos: .userInitiated).async {
+                results[index] = usageLines(for: account)
+                group.leave()
+            }
+        }
+        group.wait()
+
+        for (index, account) in file.accounts.enumerated() {
+            if index > 0 { print("") }
+            print("— \(account.name) (\(account.slug))")
+            results[index].forEach { print($0) }
+        }
+        return
     }
 
-    let file = loadAccountsPrintingMessages()
     guard let account = AccountsConfig.find(identifier: identifier, in: file) else {
         print("Account '\(identifier)' not found.")
         exit(1)
     }
+    usageLines(for: account).forEach { print($0) }
+}
 
-    func formatWindow(_ label: String, _ window: UsageWindow?) {
-        guard let window else { return }
+/// Safe to call concurrently from multiple threads: each call only touches
+/// its own `account`/local state and spawns its own `claude` subprocess via
+/// `UsageControlClient`/`ClaudeAuthStatusClient` — no shared mutable state
+/// between calls. Never prints.
+private func usageLines(for account: RegisteredAccount) -> [String] {
+    // Fails fast instead of letting UsageControlClient wait out its own
+    // timeout on an account that's obviously not logged in — same guard
+    // the GUI app's loadUsage() has.
+    guard let authStatus = try? ClaudeAuthStatusClient.fetch(configDir: account.configDir), authStatus.loggedIn else {
+        return ["  Not logged in — run: cs \(account.slug) auth login"]
+    }
+
+    func formatWindow(_ label: String, _ window: UsageWindow?) -> String? {
+        guard let window else { return nil }
         let pct = window.utilization.map { "\(Int($0))%" } ?? "?"
         let resets = window.resetsAt.map { dateFormatter.string(from: $0) } ?? "?"
-        print("  \(label): \(pct) (resets \(resets))")
+        return "  \(label): \(pct) (resets \(resets))"
     }
 
     do {
         let response = try UsageControlClient.fetch(configDir: account.configDir)
-        formatWindow("5h", response.fiveHour)
-        formatWindow("Week", response.sevenDay)
-        formatWindow("Week (Opus)", response.sevenDayOpus)
+        // `claude get_usage` can answer successfully with no rate limit data
+        // at all despite a valid login (seen for a Team account) — same
+        // case the GUI app shows a "try logging in again" prompt for,
+        // instead of silently printing nothing.
+        guard response.fiveHour != nil || response.sevenDay != nil else {
+            return ["  Usage isn't available right now. Try: cs \(account.slug) auth login"]
+        }
+        var lines = [
+            formatWindow("5h", response.fiveHour), formatWindow("Week", response.sevenDay),
+            formatWindow("Week (Opus)", response.sevenDayOpus),
+        ].compactMap { $0 }
         if let extra = response.extraUsage, extra.isEnabled {
             let pct = extra.utilization.map { "\(Int($0))%" } ?? "?"
-            print("  Extra: \(pct) (used \(extra.usedCredits ?? 0) of \(extra.monthlyLimit ?? 0))")
+            lines.append("  Extra: \(pct) (used \(extra.usedCredits ?? 0) of \(extra.monthlyLimit ?? 0))")
         }
+        return lines
     } catch {
-        print("Error: \(error)")
-    }
-}
-
-func runInstallCli() {
-    do {
-        let result = try ShellInstall.install()
-        print("OK: \(result.linkPath) -> \(result.targetPath)")
-        print("OK: \(result.aliasLinkPath) -> \(result.targetPath) (alias)")
-        if result.linkDirInPath {
-            print("Done — open a new terminal (or run 'exec $SHELL') and 'cs'/'claudes' will work.")
-        } else {
-            let dir = (result.linkPath as NSString).deletingLastPathComponent
-            print(
-                "\nWarning: \(dir) is not in your PATH yet. Add it to your shell profile "
-                    + "(~/.zshrc, for example):\n  export PATH=\"\(dir):$PATH\""
-            )
-        }
-    } catch {
-        print("Error: \(error)")
-        exit(1)
-    }
-}
-
-func runSetAccount(projectPath: String, accountName: String) {
-    let file = loadAccountsPrintingMessages()
-    guard let account = AccountsConfig.find(identifier: accountName, in: file) else {
-        print("Account '\(accountName)' not found. Registered accounts: \(file.accounts.map(\.name).joined(separator: ", "))")
-        exit(1)
-    }
-
-    do {
-        let result = try VSCodeSettings.setConfigDir(projectPath: projectPath, configDir: account.configDir)
-        print("OK: \(result.settingsPath) now uses account '\(account.name)' (\(account.configDir)).")
-        for warning in result.warnings {
-            print("\n\(warning.englishText)")
-        }
-    } catch {
-        print("Error updating settings.json: \(error)")
-        exit(1)
+        return ["  Error: \(error)"]
     }
 }
 
@@ -354,24 +424,21 @@ let rest = Array(allArgs.dropFirst())
 
 switch first {
 case "list":
-    runList()
+    runList(showExpiry: rest.contains("--expiry"))
 case "add":
     runAdd(args: rest)
+case "import":
+    runImport(args: rest)
 case "remove":
     runRemove(args: rest)
 case "set":
     runSet(args: rest)
 case "default":
     runDefault(args: rest)
-case "install-cli":
-    runInstallCli()
 case "status":
     runStatus()
 case "usage":
     runUsage(args: rest)
-case "set-account":
-    guard rest.count == 2 else { printUsage(); exit(1) }
-    runSetAccount(projectPath: rest[0], accountName: rest[1])
 case "help", "-h", "--help":
     printUsage()
 case "-v", "--version":

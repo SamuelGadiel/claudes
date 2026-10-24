@@ -1,88 +1,94 @@
-# claudes (ClaudeS) — Visão Geral
+# claudes (ClaudeS) — Overview
 
-## Problema
+## Problem
 
-Uso de múltiplas contas Claude (pessoal + trabalho) no VS Code hoje depende de:
-perfis duplicados do VS Code, extensão de terceiro para corrigir isolamento de
-credenciais, processo manual pra mover chat entre contas, e nenhuma visibilidade
-de uso/expiração. Ver histórico da conversa para o levantamento completo (13 pontos).
+Using multiple Claude accounts (personal + work) in VS Code today depends on:
+duplicated VS Code profiles, a third-party extension to fix credential
+isolation, a manual process to move chat between accounts, and no visibility
+into usage/expiry. See the conversation history for the full list (13 points).
 
-## O que este projeto é (estado atual do MVP)
+## What this project is (current MVP state)
 
-Uma camada de **gerenciamento** sobre contas Claude Code já logadas:
+A **management** layer on top of Claude Code accounts already logged in:
 
-- Descobre contas existentes (diretórios `CLAUDE_CONFIG_DIR` + credenciais no Keychain).
-- Decide, por projeto aberto no VS Code, qual conta ele usa — sem precisar de profiles.
-- Corrige o bug da extensão oficial da Anthropic que ignora `CLAUDE_CONFIG_DIR`
-  fora do processo de launch.
-- Chats compartilhados entre contas via diretório único symlinkado (`~/.claude-shared-chats`)
-  — não é mais "sync on switch" (cópia pontual), ver `specs/04-sincronizacao-sessoes`.
-- Mostra uso e expiração de cada conta num ícone de status bar do macOS, com
-  troca de conta por projeto a partir dali, e notifica (expiração de login,
-  threshold de uso, renovação de cota) mesmo com o painel fechado.
+- Discovers existing accounts (`CLAUDE_CONFIG_DIR` directories + Keychain credentials).
+- Decides, per project opened in VS Code, which account it uses — without needing profiles.
+- Fixes the official Anthropic extension's bug that ignores `CLAUDE_CONFIG_DIR`
+  outside the launch process.
+- Shared chats between accounts via a single symlinked directory (`~/.claude-shared-chats`)
+  — no longer "sync on switch" (one-off copy), see `specs/04-session-sync`.
+- Shows usage and expiry for each account in a macOS status bar icon, with
+  account switching per project right there, and notifies (login expiry,
+  usage threshold, quota renewal) even with the panel closed.
 
-## O que este projeto NÃO é (hoje)
+## What this project is NOT (today)
 
-- Não faz login nem gerencia OAuth. Só lê o que o Claude Code já gravou.
-- Não substitui o Claude Code CLI/extensão — opera ao lado deles.
-- Não é multi-plataforma nesta fase (macOS only, SwiftUI nativo).
+- Doesn't log in or manage OAuth. Only reads what Claude Code already wrote.
+- Doesn't replace the Claude Code CLI/extension — operates alongside them.
+- Not cross-platform at this stage (macOS only, native SwiftUI).
 
-## Visão de longo prazo — por que o nome é "ClaudeS", não "Claude VS Code Switcher"
+## Long-term vision — why the name is "ClaudeS", not "Claude VS Code Switcher"
 
-O escopo do MVP é deliberadamente estreito (macOS + VS Code), mas a visão do
-projeto não é. Objetivo declarado: **em qualquer lugar que o Claude atue, este
-projeto deve poder atuar também** — o "S" de "ClaudeS" carrega tanto "plural"
-(múltiplas contas) quanto "mais do que só isso" (o ecossistema Claude como um
-todo, não só uma IDE).
+The MVP's scope is deliberately narrow (macOS + VS Code), but the project's
+vision isn't. Stated goal: **wherever Claude operates, this project should be
+able to operate too** — the "S" in "ClaudeS" carries both "plural" (multiple
+accounts) and "more than just that" (the Claude ecosystem as a whole, not
+just one IDE).
 
-Direções futuras já levantadas (não compromissadas, não no MVP):
+Future directions already raised (not committed, not in the MVP):
 
-- **Outros pontos de integração além da extensão VS Code**: Claude Desktop
-  (app Electron oficial — `kevinchau/claude-switcher`, ver Kanban, é referência
-  de como outro projeto já ataca esse domínio especificamente), extensão de
-  navegador para claude.ai, qualquer outra IDE que ganhe uma extensão oficial
-  Claude no futuro.
-- **Mais métricas, extraídas do que já coletamos**: custo de API (tokens
-  gastos) por projeto e por conta, volume de chats por projeto/conta, e outras
-  métricas derivadas dos dados de uso que o monitoramento já lê.
-- **Previsão/forecast de uso**: taxa de consumo atual projetada para estimar
-  quando uma janela vai esgotar — não só o threshold reativo (75%/90%) que já
-  existe, mas um alerta proativo ("nesse ritmo, acaba em X", "abra outra
-  sessão/conta agora"). Inspirado no sistema de forecast do
-  `kevinchau/claude-switcher` (ver Kanban), mas adaptado ao nosso modelo.
-- **Widgets nativos de macOS** mostrando uso sem abrir o painel.
+- **Other integration points beyond the VS Code extension**: Claude Desktop
+  (official Electron app — `kevinchau/claude-switcher`, see Kanban, is a
+  reference for how another project already tackles that domain
+  specifically), a browser extension for claude.ai, any other IDE that gets
+  an official Claude extension in the future.
+- **More metrics, extracted from what we already collect**: API cost (tokens
+  spent) per project and per account, chat volume per project/account, and
+  other metrics derived from the usage data monitoring already reads.
+- **Usage forecasting**: projecting the current consumption rate to estimate
+  when a window will run out — not just the reactive threshold (75%/90%) that
+  already exists, but a proactive alert ("at this rate, it runs out in X",
+  "open another session/account now"). Inspired by the forecasting system of
+  `kevinchau/claude-switcher` (see Kanban), adapted to our model.
+- **Native macOS widgets** showing usage without opening the panel.
 
-Isso molda decisões de nome/ícone/identidade visual desde já (não esperar o
-ecossistema crescer para só então ajustar a marca), mas não força nenhuma
-decisão de arquitetura prematura — cada direção acima vira trabalho real só
-quando entrar no backlog com detalhe.
+This shapes name/icon/visual identity decisions now (not waiting for the
+ecosystem to grow before adjusting the brand), but doesn't force any
+premature architecture decision — each direction above only becomes real
+work once it enters the backlog with detail.
 
-## Decisões arquiteturais tomadas
+## Architectural decisions made
 
-| Decisão | Escolha | Por quê |
+| Decision | Choice | Why |
 |---|---|---|
-| Stack do app | Swift/SwiftUI nativo (menu bar `NSStatusItem`) | Acesso nativo a Keychain/Accessibility/AppleScript, sem runtime pesado residente |
-| Perfis do VS Code | Eliminados. `CLAUDE_CONFIG_DIR` setado via `.vscode/settings.json` por projeto | Um único perfil, sem duplicar extensões instaladas |
-| Patch da extensão oficial | Vendorizar `patch-core.js` + `patch-regexes.js` do projeto `leog/claude-code-config-dir-patcher-vscode` (MIT) e executá-los via `JavaScriptCore` nativo do macOS | Reaproveita a lógica (mantida ativamente pelo autor) sem reimplementar regex frágil nem depender de Node instalado |
-| Sincronização de chats | "Sync on switch": copia `projects/<hash-do-path>/*.jsonl` da conta origem pra destino, só do projeto que está trocando | Symlink global foi descartado — risco de concorrência entre contas e perda de granularidade por projeto |
-| Detecção de expiração | Leitura direta do Keychain (`Claude Code-credentials*`), campo `expiresAt`/`refreshTokenExpiresAt` em epoch ms | Não depende de nenhuma chamada de rede |
-| Uso (quota) por conta | Em aberto — não há API de usage confirmada ainda. Ver `specs/06-monitoramento-uso-expiracao` | Evitar achismo: precisa validação antes de desenhar a UI de abas |
+| App stack | Native Swift/SwiftUI (menu bar `NSStatusItem`) | Native access to Keychain/Accessibility/AppleScript, no heavy resident runtime |
+| VS Code profiles | Eliminated. `CLAUDE_CONFIG_DIR` set via `.vscode/settings.json` per project | A single profile, no duplicating installed extensions |
+| Official extension patch | Vendor `patch-core.js` + `patch-regexes.js` from the `leog/claude-code-config-dir-patcher-vscode` project (MIT) and run them via macOS's native `JavaScriptCore` | Reuses the logic (actively maintained by the author) without reimplementing fragile regex or depending on Node being installed |
+| Chat sync | "Sync on switch": copies `projects/<path-hash>/*.jsonl` from the source account to the destination, only for the project being switched | Global symlink was discarded — risk of race conditions between accounts and loss of per-project granularity |
+| Expiry detection | Direct Keychain read (`Claude Code-credentials*`), `expiresAt`/`refreshTokenExpiresAt` field in epoch ms | Doesn't depend on any network call |
+| Usage (quota) per account | Open — no confirmed usage API yet. See `specs/06-usage-expiry-monitoring` | Avoid guessing: needs validation before designing the tabs UI |
 
-## Riscos transversais conhecidos
+*(Note: the "VS Code profiles" and "Chat sync" rows above describe an early
+design later superseded — see `specs/02` and `specs/04` for what actually
+shipped. Left as originally written, not rewritten here, since this table
+is itself a point-in-time historical record.)*
 
-- **Fragilidade do patch**: a extensão oficial da Anthropic pode mudar o bundle
-  minificado e quebrar os regexes vendorizados. Mitigação: script de verificação
-  (adaptado do `check-upstream-patchability.mjs` do leog) roda antes de aplicar.
-- **`.vscode/settings.json` versionado**: se o projeto for compartilhado em time,
-  não podemos escrever `CLAUDE_CONFIG_DIR` (path local da máquina do usuário) num
-  arquivo commitado. Ver `specs/02-integracao-vscode-sem-profiles`.
-- **Segredos no Keychain**: qualquer leitura de credencial deve ficar em memória
-  o mínimo possível e nunca ser logada/persistida fora do Keychain.
+## Known cross-cutting risks
 
-## Fases (grosso modo, refinar no kanban)
+- **Patch fragility**: the official Anthropic extension may change the
+  minified bundle and break the vendored regexes. Mitigation: a verification
+  script (adapted from leog's `check-upstream-patchability.mjs`) runs before
+  applying.
+- **Versioned `.vscode/settings.json`**: if the project is shared across a
+  team, we can't write `CLAUDE_CONFIG_DIR` (a path local to the user's
+  machine) into a committed file. See `specs/02-vscode-integration-without-profiles`.
+- **Keychain secrets**: any credential read must stay in memory as briefly as
+  possible and never be logged/persisted outside the Keychain.
 
-1. Fundação: descoberta de contas + leitura de expiração via Keychain.
-2. Integração VS Code: escrita de `.vscode/settings.json` + patch vendorizado.
-3. App de status bar: listar contas, listar janelas VS Code abertas, trocar conta por projeto.
-4. Sincronização de sessões (sync on switch).
-5. Monitoramento de uso (depende de validação de API) + popup de expiração.
+## Phases (roughly, refine in the kanban)
+
+1. Foundation: account discovery + reading expiry via Keychain.
+2. VS Code integration: writing `.vscode/settings.json` + vendored patch.
+3. Status bar app: list accounts, list open VS Code windows, switch account per project.
+4. Session sync (sync on switch).
+5. Usage monitoring (depends on API validation) + expiry popup.

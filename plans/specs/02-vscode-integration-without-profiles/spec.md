@@ -1,124 +1,154 @@
-# Spec: Integração com VS Code sem profiles
+# Spec: VS Code integration without profiles
 
-Resolve: P2, P12 (um único perfil do VS Code), P7 (trocar conta de um projeto)
+Resolves: P2, P12 (a single VS Code profile), P7 (switching a project's account)
 
-## Objetivo
+## Update: final decision — `.vscode/settings.json` stopped being written
 
-Eliminar a necessidade de perfis duplicados do VS Code. A conta usada num
-projeto é decidida por `.vscode/settings.json` daquele projeto, escrito e
-mantido pelo nosso app — não pelo usuário manualmente.
+After exploring the alternatives to the "Critical risk" described below in
+depth (a separate workspace file, an environment variable injected when
+launching VS Code, native VS Code profiles — all discarded, see
+`plans/KANBAN.md`), the final decision was different: **stop writing
+`claudeCode.environmentVariables` into `.vscode/settings.json` entirely**,
+instead of accepting the risk and just warning about it.
+
+This was only possible by reverting the scope patch `specs/03` described
+(`"machine"` → `"window"`) — without it, the extension goes back to
+accepting that setting only globally (the original, never-modified
+behavior), and `.vscode/settings.json` never carries anything
+account-specific again. In exchange, a new patch (`"clauderc"`, see
+`specs/03`) teaches the extension to read `.clauderc` directly — that
+becomes the single source of truth per project, both for our app and for
+the extension.
+
+`VSCodeSettings.setConfigDir` (Core) and the `JSONSettingsFile` module it
+used were removed — they have no caller left. `GitRisk.warnings` (the
+"versioned file" warning) was also removed for the same reason: with no
+writing to `.vscode/settings.json`, there's nothing left there to warn
+about. `GitRisk.ensureIgnored` remains in use, now only by `ClauderFile`.
+
+The rest of this document (Design, Critical risk, Functional requirements,
+"Implemented and validated") is historical — it describes the earlier
+approach and why it wasn't enough on its own. Preserved without edits so as
+not to rewrite the past; doesn't reflect current behavior.
+
+## Goal
+
+Eliminate the need for duplicated VS Code profiles. The account used in a
+project is decided by that project's `.vscode/settings.json`, written and
+maintained by our app — not manually by the user.
 
 ## Design
 
-- Chave usada: `claudeCode.environmentVariables`, no formato que a extensão
-  oficial já aceita:
+- Key used: `claudeCode.environmentVariables`, in the format the official
+  extension already accepts:
   ```json
   "claudeCode.environmentVariables": [
     { "name": "CLAUDE_CONFIG_DIR", "value": "/Users/samuelgadiel/.claudew" }
   ]
   ```
-- Nosso app **faz merge**, nunca overwrite: lê o `settings.json` existente,
-  atualiza/insere apenas a entrada `CLAUDE_CONFIG_DIR` dentro do array
-  `claudeCode.environmentVariables`, preservando qualquer outra config do
-  usuário e quaisquer outras variáveis de ambiente que já estejam lá.
-- Trocar de conta num projeto = reescrever esse valor. **Validado lendo o
-  `extension.js` da extensão oficial (2.1.281, não via teste visual):**
-  reload **não é necessário** no caminho normal. A extensão registra
-  `watchEnvironmentVariablesSetting()`, que escuta
-  `workspace.onDidChangeConfiguration` especificamente para
-  `claudeCode.environmentVariables` e, ao detectar mudança, chama
-  `refreshEveryHost` — invalida cache de config, dá refresh em cada webview
-  aberto e em cada sessão ativa. O VS Code dispara esse evento sozinho ao
-  detectar a escrita em `.vscode/settings.json`, sem precisar de foco na
-  janela. (Existe uma ressalva só para o watcher de ARQUIVO do
-  `CLAUDE_CONFIG_DIR` em si — detectar login/logout feito fora da janela
-  dentro do mesmo config dir — que cai para "só após reload" se o fs.watch
-  falhar; não é o nosso caso, que muda o próprio valor do setting.)
+- Our app **merges**, never overwrites: reads the existing `settings.json`,
+  only updates/inserts the `CLAUDE_CONFIG_DIR` entry inside the
+  `claudeCode.environmentVariables` array, preserving any other user config
+  and any other environment variables already there.
+- Switching a project's account = rewriting that value. **Validated by
+  reading the official extension's `extension.js` (2.1.281, not via visual
+  testing):** a reload is **not necessary** on the normal path. The
+  extension registers `watchEnvironmentVariablesSetting()`, which listens to
+  `workspace.onDidChangeConfiguration` specifically for
+  `claudeCode.environmentVariables` and, on detecting a change, calls
+  `refreshEveryHost` — invalidates the config cache, refreshes every open
+  webview and every active session. VS Code fires that event by itself on
+  detecting the write to `.vscode/settings.json`, with no need for the
+  window to have focus. (There's one caveat, only for the FILE watcher of
+  `CLAUDE_CONFIG_DIR` itself — detecting a login/logout done outside the
+  window within the same config dir — which falls back to "only after a
+  reload" if the fs.watch fails; not our case, which changes the setting's
+  own value.)
 
-## Risco crítico: `.vscode/settings.json` versionado em projetos de time
+## Critical risk: versioned `.vscode/settings.json` in team projects
 
-`CLAUDE_CONFIG_DIR` é um path local da máquina do usuário. Se esse arquivo for
-commitado (comum em monorepos de empresa), vazamos a estrutura de diretórios
-de uma máquina para o time e, pior, forçamos a configuração de conta de uma
-pessoa em todas as outras que abrirem o projeto.
+`CLAUDE_CONFIG_DIR` is a path local to the user's machine. If this file gets
+committed (common in company monorepos), we leak one machine's directory
+structure to the team and, worse, force one person's account setup onto
+everyone else who opens the project.
 
-Opções (precisam de decisão, não assumir qual usar — perguntar quando chegar
-nesse ponto de implementação):
+Options (need a decision, don't assume which one to use — ask when we get
+to this point in the implementation):
 
-1. **Detectar se `.vscode/settings.json` está versionado** (`git check-ignore`)
-   antes de escrever. Se estiver, usar `.vscode/settings.json` mesmo assim
-   mas alertar o usuário, ou preferir uma alternativa.
-2. **VS Code multi-root workspace file** (`*.code-workspace`) fora do
-   controle de versão, com a config de ambiente no nível do workspace.
-3. **Settings de nível de pasta não versionada** — verificar se existe
-   suporte do VS Code a algo equivalente a ".env.local" para settings (não
-   há nativamente; precisaria ser `.vscode/settings.json` em `.git/info/exclude`
-   local, o que é frágil porque não viaja com o repo).
+1. **Detect whether `.vscode/settings.json` is versioned** (`git check-ignore`)
+   before writing. If it is, use `.vscode/settings.json` anyway but warn the
+   user, or prefer an alternative.
+2. **VS Code multi-root workspace file** (`*.code-workspace`) outside
+   version control, with the environment config at the workspace level.
+3. **Non-versioned folder-level settings** — check whether VS Code has
+   native support for something equivalent to ".env.local" for settings (it
+   doesn't natively; it would have to be `.vscode/settings.json` in a local
+   `.git/info/exclude`, which is fragile because it doesn't travel with the repo).
 
-Recomendação a validar com o usuário antes de implementar: checar primeiro se
-o projeto tem `.vscode/` no `.gitignore`; se sim, usar normalmente; se não,
-perguntar ao usuário antes de escrever (não decidir silenciosamente).
+Recommendation to validate with the user before implementing: first check
+whether the project has `.vscode/` in `.gitignore`; if so, use it normally;
+if not, ask the user before writing (don't decide silently).
 
-## Requisitos funcionais
+## Functional requirements
 
-1. Dado um path de projeto + um `CLAUDE_CONFIG_DIR` alvo, escrever/atualizar
-   `.vscode/settings.json` fazendo merge seguro (parse JSON, não regex).
-2. Antes de escrever, checar se `.vscode/settings.json` (ou `.vscode/`) está
-   sob controle de versão e sinalizar conforme risco acima.
-3. Ler o estado atual (qual conta um projeto está usando) direto do
-   `settings.json`, sem precisar de outra fonte de verdade duplicada.
+1. Given a project path + a target `CLAUDE_CONFIG_DIR`, write/update
+   `.vscode/settings.json` doing a safe merge (JSON parse, not regex).
+2. Before writing, check whether `.vscode/settings.json` (or `.vscode/`) is
+   under version control and flag it per the risk above.
+3. Read the current state (which account a project is using) directly from
+   `settings.json`, with no need for another duplicated source of truth.
 
-## Atualização: `.vscode/settings.json` agora é "projeção derivada"
+## Update: `.vscode/settings.json` is now a "derived projection"
 
-Desde a spec 07 (CLI `cs`), a fonte de verdade de "qual conta este projeto
-usa" passou a ser `.clauderc` (grava o **slug** da conta, não o path — por
-isso é seguro commitar). `.vscode/settings.json` continua existindo e sendo
-escrito por `cs set` (via `VSCodeSettings.setConfigDir`), mas só porque a
-extensão oficial da Anthropic exige isso — ele é sempre local, sempre
-`.gitignore`, nunca a fonte de verdade. O risco de versionamento descrito
-abaixo continua válido para ele especificamente.
+Since spec 07 (the `cs` CLI), the source of truth for "which account does
+this project use" became `.clauderc` (writes the account's **slug**, not
+the path — which is why it's safe to commit). `.vscode/settings.json` keeps
+existing and being written by `cs set` (via `VSCodeSettings.setConfigDir`),
+but only because Anthropic's official extension requires it — it's always
+local, always `.gitignore`d, never the source of truth. The versioning risk
+described below remains valid for it specifically.
 
-## Atualização: por que isso não bastava sozinho (e o que faltava)
+## Update: why this wasn't enough on its own (and what was missing)
 
-Escrever `claudeCode.environmentVariables` em `.vscode/settings.json` nunca
-teve efeito real: esse setting é declarado com `"scope": "machine"` no
-`package.json` da extensão oficial, e settings desse scope só podem ser
-definidos em *user*/*remote* settings — o VS Code ignora silenciosamente
-qualquer valor em workspace settings. Ver `specs/03-patch-extensao-vscode`
-para a correção (`VSCodeExtensionPatcher`/`VSCodeExtensionWatcher`, que
-muda esse scope para `"window"` no `package.json` instalado). Com essa
-correção, o mecanismo descrito abaixo passa a funcionar de fato.
+Writing `claudeCode.environmentVariables` into `.vscode/settings.json` never
+had any real effect: that setting is declared with `"scope": "machine"` in
+the official extension's `package.json`, and settings of that scope can
+only be defined in *user*/*remote* settings — VS Code silently ignores any
+value in workspace settings. See `specs/03-vscode-extension-patch` for the
+fix (`VSCodeExtensionPatcher`/`VSCodeExtensionWatcher`, which changes that
+scope to `"window"` in the installed `package.json`). With that fix, the
+mechanism described below actually starts working.
 
-## Implementado e validado
+## Implemented and validated
 
-`VSCodeSettings.setConfigDir` (em `Sources/ClaudeSCore/VSCodeSettings.swift`)
-faz o merge via `JSONSerialization` (não regex), sempre grava o
-`CLAUDE_CONFIG_DIR` **expandido para path absoluto** (nunca `~`, porque o
-processo que lê a env var não expande `~` sozinho — isso é responsabilidade
-do shell, que não está no caminho aqui). `GitRisk.swift` implementa a opção 1
-listada abaixo (checar `.gitignore`/tracking antes de escrever) — decisão
-tomada: sempre escrever e avisar, nunca bloquear silenciosamente, para não
-travar o fluxo do usuário em decisão que é dele.
+`VSCodeSettings.setConfigDir` (in `Sources/ClaudeSCore/VSCodeSettings.swift`)
+does the merge via `JSONSerialization` (not regex), always writes
+`CLAUDE_CONFIG_DIR` **expanded to an absolute path** (never `~`, because the
+process reading the env var doesn't expand `~` on its own — that's the
+shell's job, which isn't in the path here). `GitRisk.swift` implements
+option 1 listed below (checking `.gitignore`/tracking before writing) —
+decision made: always write and warn, never block silently, so as not to
+hold up the user's flow over a decision that's theirs to make.
 
-Testado nos três cenários: (a) merge preservando `editor.tabSize` e outra
-entrada de `claudeCode.environmentVariables` já existente, (b) arquivo com
-comentários JSONC (perda avisada explicitamente), (c) arquivo já commitado
-sem `.gitignore` (dispara aviso "ATENÇÃO").
+Tested in three scenarios: (a) merge preserving `editor.tabSize` and another
+already-existing `claudeCode.environmentVariables` entry, (b) a file with
+JSONC comments (loss explicitly warned about), (c) a file already committed
+with no `.gitignore` (fires a "WARNING" alert).
 
-**Limitação conhecida**: comentários JSONC no `settings.json` existente são
-perdidos ao salvar (o parser faz fallback de "strip comments" só para
-conseguir ler; a escrita final é sempre JSON puro). Aceitável para o MVP;
-revisitar com um parser JSONC real se isso incomodar na prática.
+**Known limitation**: JSONC comments in the existing `settings.json` are
+lost on save (the parser falls back to "strip comments" just to be able to
+read it; the final write is always plain JSON). Acceptable for the MVP;
+revisit with a real JSONC parser if this becomes annoying in practice.
 
 ## Edge cases
 
-- `.vscode/settings.json` com JSON malformado → não sobrescrever às cegas;
-  avisar o usuário e abortar a escrita.
-- `claudeCode.environmentVariables` já tem outras variáveis além de
-  `CLAUDE_CONFIG_DIR` → preservar todas, só substituir a entrada com
+- `.vscode/settings.json` with malformed JSON → don't blindly overwrite;
+  warn the user and abort the write.
+- `claudeCode.environmentVariables` already has other variables besides
+  `CLAUDE_CONFIG_DIR` → preserve all of them, only replace the entry with
   `name == "CLAUDE_CONFIG_DIR"`.
-- Projeto sem pasta `.vscode/` ainda → criar.
+- A project with no `.vscode/` folder yet → create it.
 
-## Fora de escopo
+## Out of scope
 
-- Qualquer lógica de patch da extensão oficial (ver `specs/03-patch-extensao-vscode`).
+- Any logic to patch the official extension (see `specs/03-vscode-extension-patch`).

@@ -1,111 +1,114 @@
-# Spec: Chats compartilhados entre contas
+# Spec: Shared chats between accounts
 
-Resolve: P4
+Resolves: P4
 
-> **Decisão revisada.** A versão original desta spec (sync-on-switch, cópia
-> pontual por projeto) foi substituída depois de uso real expor seus
-> problemas: duplicação (o chat continuado na conta B nunca volta pra conta
-> A), e a cópia inicial só pegava `.jsonl`, perdendo as subpastas por sessão
-> (`subagents/`, `tool-results/`). A decisão de symlink foi reaberta e
-> revisada com evidência concreta — ver abaixo.
+> **Revised decision.** This spec's original version (sync-on-switch, a
+> one-off copy per project) was replaced after real use exposed its
+> problems: duplication (a chat continued on account B never comes back to
+> account A), and the initial copy only grabbed `.jsonl`, losing the
+> per-session subfolders (`subagents/`, `tool-results/`). The symlink
+> decision was reopened and revised with concrete evidence — see below.
 
-## Decisão: todas as contas compartilham o mesmo `projects/`, via symlink
+## Decision: every account shares the same `projects/`, via a symlink
 
-`<CLAUDE_CONFIG_DIR>/projects` deixa de existir como diretório próprio de
-cada conta — é sempre um symlink apontando para `SharedSessionsDirectory`
+`<CLAUDE_CONFIG_DIR>/projects` stops existing as each account's own
+directory — it's always a symlink pointing at `SharedSessionsDirectory`
 (`~/.claude-shared-chats`, `Sources/ClaudeSCore/SharedSessionsDirectory.swift`).
-Chats passam a pertencer ao **projeto**, não à conta que estava logada quando
-foram escritos — não importa qual conta está ativa, o histórico completo de
-qualquer projeto está sempre lá.
+Chats now belong to the **project**, not to whichever account was logged in
+when they were written — no matter which account is active, any project's
+full history is always there.
 
-### Por que symlink, revisado
+### Why a symlink, revisited
 
-A spec original rejeitou symlink por dois motivos. Reavaliados:
+The original spec rejected a symlink for two reasons. Re-evaluated:
 
-1. **"Escopo indesejado: unifica todos os projetos entre as contas."**
-   Decisão consciente agora: esse é o comportamento desejado, não um efeito
-   colateral. Mitigado por uma ferramenta de controle: "Clear Chat
-   History" por projeto (ver abaixo) — não é isolamento real entre contas,
-   mas dá ao usuário uma forma explícita de não deixar o histórico de um
-   projeto específico acumulado indefinidamente.
-2. **"Risco de concorrência em `sessions/`."** A própria spec original já
-   reconhecia que esse risco era especificamente sobre `~/.claude/sessions/`
-   (locks de processo, `<pid>.json`), não sobre `projects/` — só evitou tudo
-   por precaução geral. `projects/` continua sem esse problema. Duas contas
-   escrevendo a mesma sessão ao mesmo tempo é um cenário raro, e o próprio
-   Claude Code já avisa quando detecta isso ("If another Claude Code process
-   still has the conversation open..." — confirmado na doc oficial). Não
-   tratado agora; revisitar se vier a ser um problema real.
+1. **"Unwanted scope: unifies every project across accounts."** Conscious
+   decision now: that's the desired behavior, not a side effect. Mitigated
+   by a control tool: per-project "Clear Chat History" (see below) — not
+   real isolation between accounts, but it gives the user an explicit way
+   to avoid letting a specific project's history pile up indefinitely.
+2. **"Risk of concurrency in `sessions/`."** The original spec itself
+   already acknowledged this risk was specifically about
+   `~/.claude/sessions/` (process locks, `<pid>.json`), not about
+   `projects/` — it only avoided everything out of general caution.
+   `projects/` still doesn't have this problem. Two accounts writing the
+   same session at the same time is a rare scenario, and Claude Code itself
+   already warns when it detects this ("If another Claude Code process
+   still has the conversation open..." — confirmed in the official docs).
+   Not handled now; revisit if it ever becomes a real problem.
 
-**Confirmado por evidência real, não suposição**: a técnica de symlinkar
-`projects/` entre `CLAUDE_CONFIG_DIR`s é usada por múltiplos projetos da
-comunidade (não documentada/suportada oficialmente pela Anthropic, mas
-relatada funcionando em produção). Validado também por teste próprio: um
-diretório contendo um symlink, removido recursivamente, preserva o alvo do
-link intacto — `removeAccount` não precisou de nenhuma mudança para "remover
-conta, manter os chats" funcionar.
+**Confirmed with real evidence, not an assumption**: the technique of
+symlinking `projects/` across `CLAUDE_CONFIG_DIR`s is used by multiple
+community projects (not officially documented/supported by Anthropic, but
+reported working in production). Also validated by our own test: a
+directory containing a symlink, removed recursively, leaves the link's
+target intact — `removeAccount` needed no change at all for "remove the
+account, keep the chats" to work.
 
-### Por que não uma pasta "nossa" com lógica própria por cima
+### Why not "our own" folder with custom logic on top
 
-Cogitado e descartado: tecnicamente equivalente ao symlink direto (o Claude
-Code sempre procura `projects/` relativo ao `CLAUDE_CONFIG_DIR` ativo, então
-uma pasta "gerenciada por nós" ainda precisaria ser symlinkada de volta) —
-mesmos riscos técnicos, mais código nosso por cima sem ganho real.
+Considered and discarded: technically equivalent to a direct symlink
+(Claude Code always looks for `projects/` relative to the active
+`CLAUDE_CONFIG_DIR`, so a folder "managed by us" would still need to be
+symlinked back) — same technical risks, more code of our own on top with
+no real gain.
 
 ## Design
 
 ### `SharedSessionsDirectory.adopt(configDir:accountSlug:)`
 
-Chamada em todo `addAccount` (criação de conta nova e futura importação de
-conta existente — mesmo código, mesma garantia). Nunca lê ou interpreta o
-conteúdo de um `.jsonl`/sessão — todo arquivo é tratado como blob opaco:
+Called on every `addAccount` (creating a new account and the future import
+of an existing one — same code, same guarantee). Never reads or interprets
+a `.jsonl`/session's content — every file is treated as an opaque blob:
 
-1. Se `projects/` já é o symlink certo: no-op.
-2. Se não existe nada ainda (conta nova): cria o symlink direto.
-3. Se já existe uma pasta real com sessões (conta já usada antes de adotar o
-   symlink, ou importada de fora): merge por projeto, depois por item dentro
-   de cada projeto (arquivo `.jsonl` ou subpasta de sessão inteira):
-   - Sem conflito de nome: move.
-   - Conflito, conteúdo idêntico (hash): descarta a duplicata, nada perdido.
-   - Conflito, conteúdo diferente: **nunca sobrescreve, nunca descarta**. O
-     maior (heurística: mais completo/mais recentemente continuado) fica com
-     o nome original, continua resumível pelo ID normalmente. O menor é
-     preservado ao lado com sufixo `.conflict-from-<origem>`.
-4. Remove o `projects/` original (agora vazio) e cria o symlink.
+1. If `projects/` is already the right symlink: no-op.
+2. If nothing exists yet (a new account): creates the symlink directly.
+3. If a real folder with sessions already exists (an account used before
+   adopting the symlink, or imported from outside): merge per project, then
+   per item inside each project (a `.jsonl` file or a whole session
+   subfolder):
+   - No name conflict: move it.
+   - Conflict, identical content (hash): drop the duplicate, nothing lost.
+   - Conflict, different content: **never overwrite, never discard**. The
+     larger one (heuristic: more complete/more recently continued) keeps
+     the original name, stays normally resumable by its ID. The smaller
+     one is preserved alongside it with a `.conflict-from-<origin>` suffix.
+4. Removes the original `projects/` (now empty) and creates the symlink.
 
 ### `SharedSessionsDirectory.clearHistory(forProjectPath:)`
 
-Apaga `<shared>/<dirName>/` inteiro — só aquele projeto, nenhum outro é
-tocado. Irreversível; a UI confirma antes de chamar. Acionado por "Clear Chat
-History…" na linha de cada projeto no painel.
+Deletes the whole `<shared>/<dirName>/` — only that project, no other is
+touched. Irreversible; the UI confirms before calling it. Triggered by
+"Clear Chat History…" on each project's row in the panel.
 
 ### `cs migrate-to-shared-sessions`
 
-Roda `adopt` para todas as contas já registradas — não é só para esta
-migração pontual: serve também para quem atualizar de uma versão anterior a
-este modelo, com contas já cadastradas antes de `projects/` virar symlink.
+Runs `adopt` for every already-registered account — not just for this
+one-off migration: it also serves anyone updating from a version before
+this model, with accounts already registered before `projects/` became a
+symlink.
 
-## Validado
+## Validated
 
-Testado em diretórios descartáveis (`/tmp`), não em dados reais, antes de
-rodar em produção:
-- Conta nova sem sessões: symlink criado direto.
-- Duas contas com projetos sem sobreposição: movidos sem conflito.
-- Mesmo projeto em duas contas, um arquivo idêntico nos dois: duplicata
-  descartada sem perda.
-- Mesmo projeto, mesmo nome de sessão, conteúdo diferente: ambos
-  preservados, maior manteve o nome original, menor ganhou sufixo de
-  conflito.
-- `cs remove` em conta com `projects/` symlinkado: diretório da conta e
-  credencial do Keychain removidos, conteúdo compartilhado intacto.
+Tested in disposable directories (`/tmp`), not on real data, before
+running in production:
+- A new account with no sessions: symlink created directly.
+- Two accounts with non-overlapping projects: moved with no conflict.
+- The same project in two accounts, one identical file in both: duplicate
+  dropped with no loss.
+- Same project, same session name, different content: both preserved, the
+  larger one kept the original name, the smaller one got a conflict suffix.
+- `cs remove` on an account with a symlinked `projects/`: the account's
+  directory and Keychain credential removed, shared content intact.
 
-## Fora de escopo (por ora)
+## Out of scope (for now)
 
-- Resolver concorrência real de duas contas ativas escrevendo a mesma sessão
-  ao mesmo tempo.
-- Isolamento real entre contas (ex.: conta de trabalho nunca ver histórico
-  de projetos pessoais) — hoje só existe o "Clear Chat History" manual por
-  projeto.
-- UI de importação de conta existente (seletor de pasta) — a lógica de
-  backend (`addAccount` com `dir` customizado + `adopt`) já suporta isso via
-  CLI (`cs add --dir <pasta-existente>`); falta só a UI gráfica equivalente.
+- Resolving real concurrency between two active accounts writing the same
+  session at the same time.
+- Real isolation between accounts (e.g. a work account never seeing
+  personal projects' history) — today the only tool is the manual
+  per-project "Clear Chat History".
+- Existing-account import UI (a folder picker) — the backend logic
+  (`addAccount` with a custom `dir` + `adopt`) already supports this via
+  the CLI (`cs add --dir <existing-folder>`); only the equivalent graphical
+  UI is missing.

@@ -1,19 +1,21 @@
-# Atribuições
+# Attributions
 
 ## leog/claude-code-config-dir-patcher-vscode
 
-`Sources/ClaudeSCore/ClaudeExtensionJSPatcher.swift` é uma reimplementação
-em Swift (não uma cópia literal do código-fonte) dos padrões de regex e da
-lógica de análise/transformação originalmente publicados por **Leo Giovanetti**
-em [leog/claude-code-config-dir-patcher-vscode](https://github.com/leog/claude-code-config-dir-patcher-vscode)
-(`patch-regexes.js` e `patch-core.js`), sob a licença MIT abaixo.
+`Sources/ClaudeSCore/ClaudeExtensionJSPatcher.swift` is a Swift
+reimplementation (not a literal copy of the source code) of the regex
+patterns and analysis/transform logic originally published by
+**Leo Giovanetti** in
+[leog/claude-code-config-dir-patcher-vscode](https://github.com/leog/claude-code-config-dir-patcher-vscode)
+(`patch-regexes.js` and `patch-core.js`), under the MIT license below.
 
-A descoberta de que a extensão oficial `anthropic.claude-code` lê
-`process.env.CLAUDE_CONFIG_DIR` diretamente em alguns storage helpers (em vez
-do valor resolvido de `claudeCode.environmentVariables`), e os padrões de
-regex para localizar e corrigir isso no bundle minificado da extensão, são
-trabalho dele. Validamos nossa porta Swift contra o `extension.js` oficial e
-confirmamos que ela produz uma saída byte-a-byte idêntica à do patch original.
+The discovery that the official `anthropic.claude-code` extension reads
+`process.env.CLAUDE_CONFIG_DIR` directly in some storage helpers (instead
+of the resolved value of `claudeCode.environmentVariables`), and the
+regex patterns to locate and fix this in the extension's minified bundle,
+are his work. We validated our Swift port against the official
+`extension.js` and confirmed it produces output byte-for-byte identical to
+the original patch.
 
 ```
 MIT License

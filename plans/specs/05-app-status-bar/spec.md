@@ -1,172 +1,176 @@
-# Spec: App de status bar (macOS)
+# Spec: Status bar app (macOS)
 
-Resolve: P6, P7, P8, P9, P10
+Resolves: P6, P7, P8, P9, P10
 
-## Objetivo
+## Goal
 
-Um único ícone na status bar do macOS. Clique esquerdo abre um painel
-customizado (SwiftUI, não um `NSMenu` nativo — necessário para caber barras
-de progresso e abas, que um menu nativo não suporta). Clique direito abre um
-`NSMenu` clássico (atualizações, sobre, sair).
+A single icon in the macOS status bar. Left click opens a custom panel
+(SwiftUI, not a native `NSMenu` — necessary to fit progress bars and tabs,
+which a native menu doesn't support). Right click opens a classic `NSMenu`
+(updates, about, quit).
 
-## Implementado e validado: scaffold funcional
+## Implemented and validated: functional scaffold
 
-`StatusBarController` (AppKit): `NSStatusItem` com clique esquerdo abrindo
-`NSPopover` (conteúdo via `NSHostingController<PanelView>`, SwiftUI) e
-clique direito atribuindo temporariamente `statusItem.menu` para abrir um
-`NSMenu` clássico (o menu é removido logo depois — mantê-lo fixo faria todo
-clique, incluindo o esquerdo, abrir o NSMenu em vez do popover). Validado
-rodando de verdade: painel mostra projetos abertos e contas reais, menu
-clássico abre com Verificar atualizações/Sobre/Sair funcionando.
+`StatusBarController` (AppKit): an `NSStatusItem` with a left click opening
+an `NSPopover` (content via `NSHostingController<PanelView>`, SwiftUI) and a
+right click temporarily assigning `statusItem.menu` to open a classic
+`NSMenu` (the menu is removed right after — keeping it fixed would make
+every click, including left clicks, open the NSMenu instead of the
+popover). Validated by running it for real: the panel shows open projects
+and real accounts, the classic menu opens with Check for Updates/About/Quit
+working.
 
-**Nota de processo, não de produto**: durante o desenvolvimento, processos
-GUI lançados a partir do ambiente de execução do assistente (este, via
-terminal controlado por automação) ficam com o `NSStatusItem` posicionado
-fora de qualquer tela (`X=-4036`, confirmado via `CGWindowListCopyWindowInfo`
-— reproduzido de forma idêntica trocando nome/identificador do bundle,
-descartando cache específico do app). Rodando o mesmo binário a partir de um
-terminal aberto manualmente pelo usuário, funciona normalmente. Implicação
-prática: validação visual da UI depende do usuário rodar e reportar — não
-dá para confiar em screenshot tirado a partir deste ambiente para esse app
-específico.
+**A process note, not a product one**: during development, GUI processes
+launched from this assistant's execution environment (this one, via a
+terminal controlled by automation) end up with the `NSStatusItem`
+positioned off any screen (`X=-4036`, confirmed via
+`CGWindowListCopyWindowInfo` — reproduced identically by changing the
+bundle name/identifier, ruling out app-specific caching). Running the same
+binary from a terminal manually opened by the user works normally.
+Practical implication: visual UI validation depends on the user running it
+and reporting back — a screenshot taken from this environment can't be
+trusted for this specific app.
 
-## Decisão: lista de projetos abertos, sem detectar "qual está em foco"
+## Decision: a list of open projects, without detecting "which one is in focus"
 
-Avaliamos e descartamos tentar identificar automaticamente qual janela do
-VS Code está em foco. Dois motivos, nessa ordem de peso:
+We evaluated and discarded trying to automatically identify which VS Code
+window is in focus. Two reasons, in this order of weight:
 
-1. **Frágil por design**: o título da janela do VS Code é customizável pelo
-   próprio usuário (`window.title` nas settings) — não é uma string estável
-   para basear lógica em cima.
-2. Para resolver ambiguidade de geometria entre janelas maximizadas
-   (confirmado empiricamente: duas janelas do VS Code maximizadas têm
-   bounds idênticos via `CGWindowList`), seria necessário pedir permissão
-   de Acessibilidade — fricção que o usuário preferiu evitar.
+1. **Fragile by design**: the VS Code window title is customizable by the
+   user themselves (`window.title` in settings) — not a stable string to
+   base logic on.
+2. To resolve geometry ambiguity between maximized windows (empirically
+   confirmed: two maximized VS Code windows have identical bounds via
+   `CGWindowList`), Accessibility permission would be needed — friction the
+   user preferred to avoid.
 
-Em vez disso: o painel lista **todos os projetos abertos agora**, lidos de
+Instead: the panel lists **every project open right now**, read from
 `~/Library/Application Support/Code/User/globalStorage/storage.json`
-(`windowsState.openedWindows[].folder`, uma `file://` URI com o **path
-completo** — nenhuma permissão especial necessária para ler esse arquivo).
-A lista é dinâmica: abrir/fechar uma janela do VS Code atualiza a lista na
-próxima vez que o painel for aberto (ou via watch do arquivo, se quisermos
-atualização em tempo real — ver "Fora de escopo"). Sem ambiguidade de nomes:
-cada entrada já vem com o path absoluto, não dependemos de nome de pasta.
+(`windowsState.openedWindows[].folder`, a `file://` URI with the **full
+path** — no special permission needed to read this file). The list is
+dynamic: opening/closing a VS Code window updates the list the next time
+the panel is opened (or via a file watch, if we want real-time updates —
+see "Out of scope"). No name ambiguity: each entry already comes with the
+absolute path, we don't depend on a folder name.
 
-Cada linha da lista tem: nome da pasta (último componente do path), a conta
-atualmente associada a ela, e uma forma de trocar (dispara o mesmo fluxo de
-`cs set` — grava `.clauderc` + `.vscode/settings.json`, specs 02/07).
+Each row in the list has: the folder's name (the path's last component),
+the account currently associated with it, and a way to switch (triggers the
+same `cs set` flow — writes `.clauderc` + `.vscode/settings.json`, specs
+02/07).
 
-## Segunda seção: sessões `claude` rodando em terminal
+## Second section: `claude` sessions running in a terminal
 
-Além dos projetos abertos no VS Code, o painel lista processos `claude`
-rodando fora de qualquer IDE — detecção validada em `specs/06` via
-`sysctl`/`KERN_PROCARGS2` (lê o `CLAUDE_CONFIG_DIR` real do ambiente do
-processo, não uma inferência) + `proc_pidinfo`/`PROC_PIDVNODEPATHINFO`
-(cwd real). Filtra processos da extensão VS Code pelos flags que só ela
-passa (`--output-format stream-json` etc.), para não duplicar com a seção
-de projetos.
+Besides the projects open in VS Code, the panel lists `claude` processes
+running outside any IDE — detection validated in `specs/06` via
+`sysctl`/`KERN_PROCARGS2` (reads the process's real `CLAUDE_CONFIG_DIR`
+from its environment, not an inference) + `proc_pidinfo`/`PROC_PIDVNODEPATHINFO`
+(real cwd). Filters out VS Code extension processes by the flags only it
+passes (`--output-format stream-json`, etc.), to avoid duplicating with the
+projects section.
 
-**Limitação importante a comunicar na UI**: não é possível trocar a conta
-de uma sessão **já em execução** — variáveis de ambiente de um processo
-rodando são fixas desde que ele iniciou, não há API para alterá-las de
-fora. "Trocar" aqui significa atualizar o `.clauderc` daquele diretório
-(mesmo mecanismo de `cs set`), valendo a partir da próxima vez que
-`claude`/`cs` for rodado ali — a sessão atual continua com a conta antiga
-até ser reiniciada. A UI deve deixar isso claro (ex.: "válido na próxima
-execução"), não sugerir efeito imediato.
+**Important limitation to communicate in the UI**: it's not possible to
+switch the account of an **already-running** session — a running
+process's environment variables are fixed from the moment it started,
+there's no API to change them from outside. "Switching" here means
+updating that directory's `.clauderc` (the same mechanism as `cs set`),
+taking effect the next time `claude`/`cs` is run there — the current
+session keeps the old account until restarted. The UI must make this clear
+(e.g. "takes effect on the next run"), not suggest an immediate effect.
 
-## Arquitetura técnica
+## Technical architecture
 
-- `NSStatusItem` com um botão que distingue clique esquerdo de clique
-  direito (`NSStatusBarButton` + checagem do tipo de evento, ou
-  `NSEvent.modifierFlags`/`rightMouseDown` — AppKit puro, não dá para usar
-  `MenuBarExtra` do SwiftUI aqui porque ele não separa clique esquerdo de
-  direito de forma simples).
-- Clique esquerdo → `NSPopover` cujo `contentViewController` é um
-  `NSHostingController` hospedando a view SwiftUI do painel (permite usar
-  `TabView`, `ProgressView` etc. com toda a liberdade do SwiftUI).
-- Clique direito → `NSMenu` clássico de verdade (`statusItem.menu`),
-  populado com os itens básicos (ver abaixo).
-- Toda a lógica de dados vem de `ClaudeSCore` (mesmo Core do `cs`) —
-  este target só monta UI em cima dela, igual o `cs` só faz parsing/print
-  em cima dela. Nenhuma duplicação de lógica de negócio.
+- An `NSStatusItem` with a button that distinguishes a left click from a
+  right click (`NSStatusBarButton` + checking the event type, or
+  `NSEvent.modifierFlags`/`rightMouseDown` — plain AppKit, SwiftUI's
+  `MenuBarExtra` can't be used here because it doesn't separate left from
+  right click in a simple way).
+- Left click → an `NSPopover` whose `contentViewController` is an
+  `NSHostingController` hosting the panel's SwiftUI view (allows using
+  `TabView`, `ProgressView`, etc. with full SwiftUI freedom).
+- Right click → a real classic `NSMenu` (`statusItem.menu`), populated with
+  the basic items (see below).
+- All the data logic comes from `ClaudeSCore` (the same Core as `cs`) —
+  this target only builds UI on top of it, same as `cs` only does
+  parsing/printing on top of it. No business logic duplication.
 
-## Layout do painel (clique esquerdo)
+## Panel layout (left click)
 
 ```
-Projetos abertos (VS Code)
-  claudes                      Pessoal   [trocar ▾]
-  sivisamais_mobile_agente     Trabalho  [trocar ▾]
+Open Projects (VS Code)
+  claudes                      Personal   [switch ▾]
+  sivisamais_mobile_agente     Work       [switch ▾]
 ―――――――――――――――――――――――――――
-Sessões de terminal
-  ~/dev/outro-projeto          Trabalho  [trocar ▾ — vale na próxima execução]
+Terminal Sessions
+  ~/dev/other-project           Work       [switch ▾ — takes effect on the next run]
 ―――――――――――――――――――――――――――
-[ Pessoal ]  [ Trabalho ]          ← abas
-   5h:     ███████░░░ 68%  reseta em 2h40
-   Semana: ████░░░░░░ 41%  reseta sex 09:00
-   (Extra: ██░░░░░░░░ 15%)         ← só se a conta tiver crédito extra ativo
+[ Personal ]  [ Work ]          ← tabs
+   5h:     ███████░░░ 68%  resets in 2h40
+   Week:   ████░░░░░░ 41%  resets Fri 09:00
+   (Extra: ██░░░░░░░░ 15%)         ← only if the account has active extra credit
 ```
 
-Dados de uso vêm de `specs/06-monitoramento-uso-expiracao` (já resolvida:
-endpoint real `GET /api/oauth/usage`, não é mais bloqueio).
+Usage data comes from `specs/06-usage-expiry-monitoring` (already
+resolved: real endpoint `GET /api/oauth/usage`, no longer blocked).
 
-## Menu clássico (clique direito)
+## Classic menu (right click)
 
-Verificar atualizações · Sobre o ClaudeS · Sair.
+Check for Updates · About ClaudeS · Quit.
 
-## Modelo de dados
+## Data model
 
-- Conta: `RegisteredAccount` + `AccountStatus` (spec 01), já existentes no
-  Core, reusados sem alteração.
-- Projeto aberto: `{ path, nome da pasta }`, lido do `storage.json` do VS
-  Code — não persistimos isso, é lido fresco a cada abertura do painel.
-- Associação projeto↔conta: fonte de verdade é `.clauderc` (spec 07), nunca
-  duplicada em config própria do app — evita os dois ficarem
-  dessincronizados. `.vscode/settings.json` é escrito como projeção
-  derivada no mesmo gesto (mesma função `VSCodeSettings.setConfigDir` que o
-  `cs set` já usa).
+- Account: `RegisteredAccount` + `AccountStatus` (spec 01), already
+  existing in Core, reused with no changes.
+- Open project: `{ path, folder name }`, read from VS Code's
+  `storage.json` — we don't persist this, it's read fresh every time the
+  panel opens.
+- Project↔account association: the source of truth is `.clauderc` (spec
+  07), never duplicated in the app's own config — avoids the two getting
+  out of sync. `.vscode/settings.json` is written as a derived projection
+  in the same gesture (the same `VSCodeSettings.setConfigDir` function
+  `cs set` already uses).
 
-## Trocar de conta no painel — efeito real
+## Switching accounts in the panel — real effect
 
-Mesmo fluxo do `cs set`: grava `.clauderc`, atualiza `.vscode/settings.json`
-via merge seguro, e (quando a spec 03 — patch do leog — estiver
-implementada) garante que a extensão oficial reconheça a mudança. Pergunta
-antes se quer sincronizar o histórico daquele projeto (spec 04) da conta
-atual para a nova.
+The same flow as `cs set`: writes `.clauderc`, updates
+`.vscode/settings.json` via a safe merge, and (once spec 03 — leog's
+patch — is implemented) makes sure the official extension recognizes the
+change. Asks beforehand whether to sync that project's history (spec 04)
+from the current account to the new one.
 
-## Notificação de expiração
+## Expiry notification
 
-`UserNotifications` (framework nativo) quando `refreshTokenExpiresAt`
-(nunca `expiresAt` — ver spec 01) de uma conta estiver próximo ou passado.
-Checagem periódica lendo o Keychain (custo de IO desprezível, mesmo
-mecanismo de `AccountDiscovery.status`).
+`UserNotifications` (native framework) when an account's
+`refreshTokenExpiresAt` (never `expiresAt` — see spec 01) is close or past.
+Periodic check reading the Keychain (negligible I/O cost, the same
+mechanism as `AccountDiscovery.status`).
 
-## Instalação do `cs` na primeira abertura
+## Installing `cs` on first launch
 
-Na primeira abertura do app, chama `ShellInstall.install()` (spec 07) para
-deixar o comando `cs` disponível no terminal, sem o usuário precisar rodar
-nada manualmente. Mostra o resultado (link criado, ou instrução manual se
-nenhum diretório candidato for gravável).
+On the app's first launch, calls `ShellInstall.install()` (spec 07) to make
+the `cs` command available in the terminal, with no need for the user to
+run anything manually. Shows the result (link created, or manual
+instructions if no candidate directory is writable).
 
 ## Edge cases
 
-- Nenhuma conta registrada ainda → estado vazio orientando a usar `cs add`
-  ou um fluxo equivalente na própria GUI (a decidir: GUI replica `cs add`,
-  ou só orienta a rodar o comando — ver próxima rodada de design).
-- VS Code não está rodando / `storage.json` não existe → lista de projetos
-  vazia, sem erro.
-- Projeto aberto sem `.clauderc` ainda → mostra "conta não definida",
-  oferece definir uma (ou cai na default, igual o `cs` faz).
+- No account registered yet → an empty state pointing to using `cs add` or
+  an equivalent flow in the GUI itself (to decide: does the GUI replicate
+  `cs add`, or just point to running the command — see the next design
+  round).
+- VS Code isn't running / `storage.json` doesn't exist → empty project
+  list, no error.
+- An open project with no `.clauderc` yet → shows "account not set", offers
+  to set one (or falls back to the default, same as `cs` does).
 
-## Fora de escopo nesta spec (por enquanto)
+## Out of scope for this spec (for now)
 
-- Atualização em tempo real da lista de projetos via file-watch do
-  `storage.json` (começar só com "lê fresco ao abrir o painel").
-- Fluxo de `add`/`remove` de conta pela própria GUI (replicar o que `cs`
-  já faz por linha de comando) — decidir se entra já ou fica para depois.
-- Lógica de patch (spec 03) e sincronização de sessão (spec 04) — este app
-  só os invoca.
-- Janela "cheia" de gerenciamento (fora do painel do ícone) — usuário já
-  confirmou não ser prioridade agora.
-- Empacotamento do `.app` de distribuição (ícone, assinatura, notarização,
-  GitHub Releases) — ver `specs/07-cli-gateway`.
+- Real-time updates of the project list via a file watch on `storage.json`
+  (start with just "read fresh when the panel opens").
+- An account add/remove flow from the GUI itself (replicating what `cs`
+  already does from the command line) — decide whether it goes in now or
+  is left for later.
+- Patch logic (spec 03) and session sync (spec 04) — this app only invokes them.
+- A "full" management window (outside the icon's panel) — the user already
+  confirmed this isn't a priority right now.
+- Packaging the distribution `.app` (icon, signing, notarization, GitHub
+  Releases) — see `specs/07-cli-gateway`.

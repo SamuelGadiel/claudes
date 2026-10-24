@@ -1,78 +1,80 @@
-# Spec: Gerenciamento de contas e storage
+# Spec: Account management and storage
 
-Resolve: P1 (múltiplas contas), P5 (adicionar conta sem fricção), P9 (expiração)
+Resolves: P1 (multiple accounts), P5 (adding an account with no friction), P9 (expiry)
 
-## Objetivo
+## Goal
 
-Descobrir quais contas Claude Code existem na máquina, ler seus metadados de
-expiração sem fazer nenhuma chamada de rede, e permitir registrar uma conta
-nova sem editar aliases/scripts manualmente.
+Discover which Claude Code accounts exist on the machine, read their expiry
+metadata with no network call at all, and allow registering a new account
+without manually editing aliases/scripts.
 
-## O que já sabemos (validado nesta máquina)
+## What we already know (validated on this machine)
 
-- Cada conta corresponde a um `CLAUDE_CONFIG_DIR` (ex.: `~/.claude`, `~/.claudew`).
-- A credencial fica no Keychain do macOS, classe `genp` (generic password),
-  serviço `Claude Code-credentials` — e variantes com sufixo hash
-  (`Claude Code-credentials-<hash>`), uma por `CLAUDE_CONFIG_DIR` não-default.
-- O conteúdo do item é um JSON com `claudeAiOauth.{accessToken,refreshToken,
-  expiresAt,refreshTokenExpiresAt,subscriptionType,rateLimitTier}` e também
-  tokens de MCP OAuth de plugins (Atlassian, Figma etc.) — **não tocar nesses
-  campos**, são de outros produtos.
-- `expiresAt`/`refreshTokenExpiresAt` são epoch millisseconds.
+- Each account corresponds to a `CLAUDE_CONFIG_DIR` (e.g. `~/.claude`, `~/.claudew`).
+- The credential sits in the macOS Keychain, class `genp` (generic password),
+  service `Claude Code-credentials` — and hash-suffixed variants
+  (`Claude Code-credentials-<hash>`), one per non-default `CLAUDE_CONFIG_DIR`.
+- The item's content is a JSON with `claudeAiOauth.{accessToken,refreshToken,
+  expiresAt,refreshTokenExpiresAt,subscriptionType,rateLimitTier}` and also
+  plugin MCP OAuth tokens (Atlassian, Figma, etc.) — **don't touch those
+  fields**, they belong to other products.
+- `expiresAt`/`refreshTokenExpiresAt` are epoch milliseconds.
 
-## Regra do sufixo de Keychain — confirmada
+## Keychain suffix rule — confirmed
 
-`sha256(<path absoluto do CLAUDE_CONFIG_DIR>)`, primeiros 8 caracteres hex.
-Validado nesta máquina: `/Users/samuelgadiel/.claude` → `c2f365e1`,
-`/Users/samuelgadiel/.claudew` → `f7d651a4`. Serviço de Keychain = `"Claude
-Code-credentials"` sem sufixo quando `CLAUDE_CONFIG_DIR` é o default
-(`~/.claude`), ou `"Claude Code-credentials-<hash8>"` para qualquer outro
-diretório.
+`sha256(<absolute path of CLAUDE_CONFIG_DIR>)`, first 8 hex characters.
+Validated on this machine: `/Users/samuelgadiel/.claude` → `c2f365e1`,
+`/Users/samuelgadiel/.claudew` → `f7d651a4`. Keychain service = `"Claude
+Code-credentials"` with no suffix when `CLAUDE_CONFIG_DIR` is the default
+(`~/.claude`), or `"Claude Code-credentials-<hash8>"` for any other directory.
 
-Observação: havia um terceiro sufixo (`cc6319df`) nesta máquina que não
-corresponde a nenhum `CLAUDE_CONFIG_DIR` conhecido — provável resíduo de um
-diretório de teste usado no passado. Não precisa de ação; a descoberta de
-contas (R1) só considera `CLAUDE_CONFIG_DIR`s que o usuário registrou
-explicitamente, então um sufixo órfão simplesmente não aparece na lista.
+Note: there was a third suffix (`cc6319df`) on this machine that doesn't
+match any known `CLAUDE_CONFIG_DIR` — likely a leftover from a test
+directory used in the past. No action needed; account discovery (R1) only
+considers `CLAUDE_CONFIG_DIR`s the user has explicitly registered, so an
+orphaned suffix simply doesn't show up in the list.
 
-## Requisitos funcionais
+## Functional requirements
 
-1. Listar `CLAUDE_CONFIG_DIR`s conhecidos: default (`~/.claude`) + qualquer
-   diretório que o usuário tenha registrado explicitamente na nossa config
-   (ver R3). Não tentar "adivinhar" outros diretórios por varredura do disco.
-2. Para cada `CLAUDE_CONFIG_DIR`, localizar o item de Keychain correspondente
-   e extrair `expiresAt`/`refreshTokenExpiresAt`/`subscriptionType` — sem
-   nunca persistir `accessToken`/`refreshToken` fora do Keychain.
-3. Permitir ao usuário "adicionar conta": o app pede um nome amigável (ex.:
-   "Trabalho") e um `CLAUDE_CONFIG_DIR` (sugerindo um novo path tipo
-   `~/.claude-<nome>` se vazio). Não há fluxo de login — o usuário faz login
-   manualmente com `CLAUDE_CONFIG_DIR=<path> claude` uma vez; nosso app só
-   passa a monitorar esse diretório depois.
-4. Persistir a lista de contas registradas (nome amigável ↔ `CLAUDE_CONFIG_DIR`)
-   num arquivo de config do próprio app (ex. `~/Library/Application
-   Support/ClaudeS/accounts.json`), nunca em texto plano com segredo.
+1. List known `CLAUDE_CONFIG_DIR`s: the default (`~/.claude`) + any directory
+   the user has explicitly registered in our config (see R3). Don't try to
+   "guess" other directories by scanning the disk.
+2. For each `CLAUDE_CONFIG_DIR`, locate the matching Keychain item and
+   extract `expiresAt`/`refreshTokenExpiresAt`/`subscriptionType` — never
+   persisting `accessToken`/`refreshToken` outside the Keychain.
+3. Let the user "add an account": the app asks for a friendly name (e.g.
+   "Work") and a `CLAUDE_CONFIG_DIR` (suggesting a new path like
+   `~/.claude-<name>` if left empty). There's no login flow — the user logs
+   in manually with `CLAUDE_CONFIG_DIR=<path> claude` once; our app only
+   starts monitoring that directory afterward.
+4. Persist the list of registered accounts (friendly name ↔ `CLAUDE_CONFIG_DIR`)
+   in the app's own config file (e.g. `~/Library/Application
+   Support/ClaudeS/accounts.json`), never as plain text with a secret.
 
-## Leitura de Keychain — como
+## Reading the Keychain — how
 
-Usar `Security.framework` (via Swift, `SecItemCopyMatching`) filtrando por
-`kSecAttrService`. A primeira leitura de cada item vai disparar o prompt
-nativo do macOS pedindo permissão ("ClaudeS quer acessar... "); é
-esperado e deve ser comunicado ao usuário na primeira execução.
+Use `Security.framework` (via Swift, `SecItemCopyMatching`) filtering by
+`kSecAttrService`. The first read of each item will trigger the native
+macOS prompt asking for permission ("ClaudeS wants to access..."); this is
+expected and should be communicated to the user on the first run.
 
 ## Edge cases
 
-- Item de Keychain não encontrado para um `CLAUDE_CONFIG_DIR` registrado →
-  estado "nunca logado / credencial removida", mostrar isso na UI, não travar.
-- `expiresAt` (access token) no passado é **normal e não deve gerar alerta** —
-  o Claude Code renova o access token automaticamente via `refreshToken` em
-  segundo plano (confirmado: nesta máquina a conta Pessoal está com access
-  token expirado e funcionando normalmente). O alerta de expiração real
-  (consumido por `specs/05-app-status-bar`, P9) deve observar
-  `refreshTokenExpiresAt` — é esse que força novo login manual quando passa.
-- Dois `CLAUDE_CONFIG_DIR`s apontando pro mesmo hash de Keychain (colisão) →
-  log de aviso; não deve acontecer na prática mas não presumir unicidade sem checar.
+- No Keychain item found for a registered `CLAUDE_CONFIG_DIR` → "never
+  logged in / credential removed" state, show this in the UI, don't hang.
+- `expiresAt` (access token) in the past is **normal and shouldn't trigger
+  an alert** — Claude Code automatically renews the access token via
+  `refreshToken` in the background (confirmed: on this machine the Personal
+  account has an expired access token and is working normally). The real
+  expiry alert (consumed by `specs/05-app-status-bar`, P9) should watch
+  `refreshTokenExpiresAt` — that's the one that forces a new manual login
+  once it passes.
+- Two `CLAUDE_CONFIG_DIR`s pointing at the same Keychain hash (collision) →
+  warning log; shouldn't happen in practice but don't assume uniqueness
+  without checking.
 
-## Fora de escopo
+## Out of scope
 
-- Validar o accessToken contra a API da Anthropic (isso é rede — ver P9 "popup
-  de expiração" que pode ser só client-side via `expiresAt`, sem round-trip).
+- Validating the accessToken against the Anthropic API (that's network — see
+  P9's "expiry popup", which can be purely client-side via `expiresAt`, with
+  no round trip).

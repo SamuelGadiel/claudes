@@ -113,6 +113,11 @@
 "skipped (%@)" = "ignorada (%@)";
 "error — %@" = "erro — %@";
 
+/* Background patch notifications (VSCodeExtensionWatcher) */
+"Patch applied" = "Patch aplicado";
+"ClaudeS patched the Claude Code extension in VS Code." = "O ClaudeS aplicou o patch na extensão Claude Code no VS Code.";
+"ClaudeS couldn't fully patch the Claude Code extension. Right-click the status bar icon and choose \"Reapply Patch to Claude Extension\" for details." = "O ClaudeS não conseguiu aplicar o patch por completo na extensão Claude Code. Clique com o botão direito no ícone da barra de status e escolha \"Reaplicar Patch na Extensão Claude\" para ver os detalhes.";
+
 /* Panel — status messages (PanelViewModel) */
 "unregistered account" = "conta não cadastrada";
 "%@ now uses %@" = "%@ agora usa %@";

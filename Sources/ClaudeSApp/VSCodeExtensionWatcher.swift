@@ -1,5 +1,6 @@
 import ClaudeSCore
 import Foundation
+import UserNotifications
 
 /// Keeps the two patches of the official Claude Code extension (see
 /// ClaudePatchCoordinator) always applied, reacting in real time when
@@ -21,10 +22,15 @@ final class VSCodeExtensionWatcher {
     private var debounceWorkItem: DispatchWorkItem?
 
     func start() {
-        applyNow()
-
-        for root in VSCodeEditorRoot.allCases {
-            watch(path: root.extensionsDirPath)
+        // See AccountAuthMonitor's note on requestAuthorization — scheduling
+        // before the callback returns would get the notification silently
+        // discarded if permission was still "not determined".
+        requestAuthorization { [weak self] in
+            guard let self else { return }
+            self.applyNow()
+            for root in VSCodeEditorRoot.allCases {
+                self.watch(path: root.extensionsDirPath)
+            }
         }
     }
 
@@ -65,8 +71,75 @@ final class VSCodeExtensionWatcher {
         // .utility: the extension.js patch can take up to ~1.6s in rare
         // cases (retry/backoff against an update in progress) — never on the
         // main thread.
-        Task.detached(priority: .utility) {
-            await ClaudePatchCoordinator.applyAll(log: true)
+        Task.detached(priority: .utility) { [weak self] in
+            let summary = await ClaudePatchCoordinator.applyAll(log: true)
+            await self?.notifyIfNeeded(summary)
         }
+    }
+
+    /// This runs unattended (app launch, or a background extension update
+    /// caught by the watcher) — the user never asked for it, so it only
+    /// speaks up when there's something worth knowing: a patch that just
+    /// got applied, or a real failure. Silent when nothing changed
+    /// (everything already patched) or when there's no supported editor
+    /// installation at all (expected for terminal-only users).
+    private func notifyIfNeeded(_ summary: ClaudePatchCoordinator.Summary) {
+        guard notificationsAvailable, !summary.entries.isEmpty else { return }
+
+        if summary.hadRealError {
+            notify(
+                identifier: "vscode-patch-error",
+                title: String(localized: "Patch not fully applied", bundle: AppResources.bundle),
+                body: String(
+                    localized: "ClaudeS couldn't fully patch the Claude Code extension. Right-click the status bar icon and choose \"Reapply Patch to Claude Extension\" for details.",
+                    bundle: AppResources.bundle
+                )
+            )
+            return
+        }
+
+        let appliedSomething = summary.entries.contains {
+            Self.wasAppliedNow($0.clauderc) || Self.wasAppliedNow($0.env)
+        }
+        guard appliedSomething else { return }
+
+        notify(
+            identifier: "vscode-patch-applied",
+            title: String(localized: "Patch applied", bundle: AppResources.bundle),
+            body: String(
+                localized: "ClaudeS patched the Claude Code extension in VS Code.",
+                bundle: AppResources.bundle
+            )
+        )
+    }
+
+    private static func wasAppliedNow(_ outcome: ClaudePatchCoordinator.SubPatchOutcome) -> Bool {
+        if case .appliedNow = outcome { return true }
+        return false
+    }
+
+    private var notificationsAvailable: Bool {
+        Bundle.main.bundleIdentifier != nil
+    }
+
+    private func requestAuthorization(completion: @escaping () -> Void) {
+        guard notificationsAvailable else {
+            completion()
+            return
+        }
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in
+            DispatchQueue.main.async { completion() }
+        }
+    }
+
+    private func notify(identifier: String, title: String, body: String) {
+        let content = UNMutableNotificationContent()
+        content.title = title
+        content.body = body
+        content.sound = .default
+
+        UNUserNotificationCenter.current().add(
+            UNNotificationRequest(identifier: identifier, content: content, trigger: nil)
+        )
     }
 }

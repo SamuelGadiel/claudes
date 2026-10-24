@@ -113,6 +113,11 @@
 "skipped (%@)" = "skipped (%@)";
 "error — %@" = "error — %@";
 
+/* Background patch notifications (VSCodeExtensionWatcher) */
+"Patch applied" = "Patch applied";
+"ClaudeS patched the Claude Code extension in VS Code." = "ClaudeS patched the Claude Code extension in VS Code.";
+"ClaudeS couldn't fully patch the Claude Code extension. Right-click the status bar icon and choose \"Reapply Patch to Claude Extension\" for details." = "ClaudeS couldn't fully patch the Claude Code extension. Right-click the status bar icon and choose \"Reapply Patch to Claude Extension\" for details.";
+
 /* Panel — status messages (PanelViewModel) */
 "unregistered account" = "unregistered account";
 "%@ now uses %@" = "%@ now uses %@";

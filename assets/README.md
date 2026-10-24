@@ -16,10 +16,16 @@ consumed by the build or the code today.
   no duplicate copy in `Packaging/`.
 - `ClaudeS.png` — the same art as a plain PNG (1024px), useful for
   README/GitHub.
+- `ClaudeS-rounded.png` — the actual macOS-rendered icon (squircle mask,
+  shading and all), extracted once via `QLThumbnailGenerator` (the same
+  pipeline the Finder/Dock use to draw app icons) against the built
+  `ClaudeS.app`, instead of approximating the curve by hand. Used anywhere
+  that doesn't apply the OS mask itself, like the README on GitHub.
 - `menu-bar/status-bar-template-64.png` — the source of the menu
   bar icon in use (see the section below). The only file kept from that
   folder of the original kit; the rest of it (the white variant, other
   sizes) isn't used.
+- `screenshots/` — app screenshots embedded in the top-level README.
 
 ## Status bar icon
 

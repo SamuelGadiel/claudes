@@ -1,6 +1,8 @@
 <div align="center">
-  <img src="assets/ClaudeS-rounded.png" width="120" height="120" alt="ClaudeS icon">
-  <h1>ClaudeS</h1>
+  <h1>
+    <img src="assets/ClaudeS-rounded.png" width="120" height="120" alt="ClaudeS icon"><br>
+    ClaudeS
+  </h1>
   <p><strong>Run Claude Code under multiple accounts, side by side, without fighting VS Code over it.</strong></p>
 
   ![Platform](https://img.shields.io/badge/platform-macOS%2013%2B-blue?style=flat-square)
@@ -11,10 +13,10 @@
 
 <br>
 
-<table align="center"><tr>
-  <td valign="top"><img src="assets/screenshots/panel.png" width="340" alt="ClaudeS menu bar panel showing open VS Code projects and account usage"></td>
-  <td valign="top"><img src="assets/screenshots/panel-high-usage.png" width="340" alt="ClaudeS panel with session usage above 75%, shown in orange"></td>
-</tr></table>
+<p align="center">
+  <img src="assets/screenshots/panel.png" width="340" alt="ClaudeS menu bar panel showing open VS Code projects and account usage">
+  <img src="assets/screenshots/panel-high-usage.png" width="340" alt="ClaudeS panel with session usage above 75%, shown in orange">
+</p>
 
 ## Why
 
@@ -53,15 +55,13 @@ Download the latest `ClaudeS-*.zip` from [Releases](https://github.com/SamuelGad
 - **Native and small** — Swift + SwiftUI, no Electron, no background daemon you didn't ask for.
 - English and Portuguese (BR).
 
-<table align="center">
-<tr>
-  <td valign="top"><img src="assets/screenshots/accounts-menu.png" width="400" alt="Add, import, or remove an account right from the panel"></td>
-  <td valign="top"><img src="assets/screenshots/menu.png" width="400" alt="ClaudeS menu bar right-click menu"></td>
-</tr>
-<tr>
-  <td colspan="2" align="center"><img src="assets/screenshots/patch-verified.png" width="400" alt="VS Code extension patch verification result"></td>
-</tr>
-</table>
+<p align="center">
+  <img src="assets/screenshots/accounts-menu.png" width="400" alt="Add, import, or remove an account right from the panel">
+  <img src="assets/screenshots/menu.png" width="400" alt="ClaudeS menu bar right-click menu">
+</p>
+<p align="center">
+  <img src="assets/screenshots/patch-verified.png" width="400" alt="VS Code extension patch verification result">
+</p>
 
 ## Command line
 

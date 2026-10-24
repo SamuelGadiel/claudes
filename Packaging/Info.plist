@@ -2,51 +2,38 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>CFBundleExecutable</key>
-    <string>ClaudeSApp</string>
-    <key>CFBundleIdentifier</key>
-    <string>com.samuelgadiel.ClaudeS</string>
-    <key>CFBundleName</key>
-    <string>ClaudeS</string>
-    <key>CFBundleDisplayName</key>
-    <string>ClaudeS</string>
-    <key>CFBundlePackageType</key>
-    <string>APPL</string>
-    <!-- The single source of truth for the app's version — bumped in
-         place by .github/workflows/release.yml (CFBundleShortVersionString
-         follows semver; CFBundleVersion is a separate build counter that
-         always increments by 1 and never resets, even across a major/minor
-         bump). -->
-    <key>CFBundleShortVersionString</key>
-    <string>1.0.0</string>
-    <key>CFBundleVersion</key>
-    <string>1</string>
-    <key>CFBundleIconFile</key>
-    <string>AppIcon</string>
-    <!-- Required for automatic system-language resolution to work at all —
-         confirmed empirically: without this, .lproj folders in the bundle
-         are never matched against the user's language preferences, even
-         with the right AppleLanguages set. -->
-    <key>CFBundleDevelopmentRegion</key>
-    <string>en</string>
-    <key>CFBundleLocalizations</key>
-    <array>
-        <string>en</string>
-        <string>pt-BR</string>
-    </array>
-    <!-- Status bar (menu bar extra) app — no Dock icon, no menu bar at the
-         top, no regular app window chrome. -->
-    <key>LSUIElement</key>
-    <true/>
-    <key>LSMinimumSystemVersion</key>
-    <string>13.0</string>
-    <key>NSHumanReadableCopyright</key>
-    <string>Copyright © 2026 Samuel Gadiel. MIT License.</string>
-    <!-- SMAppService (launch at login) needs this declared, even though we
-         don't use a separate helper bundle — the main app registers itself. -->
-    <key>NSSupportsAutomaticTermination</key>
-    <false/>
-    <key>NSSupportsSuddenTermination</key>
-    <false/>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleDisplayName</key>
+	<string>ClaudeS</string>
+	<key>CFBundleExecutable</key>
+	<string>ClaudeSApp</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
+	<key>CFBundleIdentifier</key>
+	<string>com.samuelgadiel.ClaudeS</string>
+	<key>CFBundleLocalizations</key>
+	<array>
+		<string>en</string>
+		<string>pt-BR</string>
+	</array>
+	<key>CFBundleName</key>
+	<string>ClaudeS</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0.1</string>
+	<key>CFBundleVersion</key>
+	<string>2</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>13.0</string>
+	<key>LSUIElement</key>
+	<true/>
+	<key>NSHumanReadableCopyright</key>
+	<string>Copyright © 2026 Samuel Gadiel. MIT License.</string>
+	<key>NSSupportsAutomaticTermination</key>
+	<false/>
+	<key>NSSupportsSuddenTermination</key>
+	<false/>
 </dict>
 </plist>

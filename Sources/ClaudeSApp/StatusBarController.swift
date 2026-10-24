@@ -189,9 +189,35 @@ final class StatusBarController: NSObject {
                 alert.alertStyle = summary.hadRealError ? .warning : .informational
             }
             alert.addButton(withTitle: String(localized: "OK", bundle: AppResources.bundle))
+            // NSAlert sizes its text area off the accessoryView's width — without this,
+            // informativeText wraps at its own ~300pt default, breaking lines like
+            // "Env propagation fix: already applied" mid-sentence. Measured from the
+            // actual strings so the window is only as wide as the content needs.
+            let width = Self.accessoryWidth(for: alert.messageText, informativeText: alert.informativeText)
+            alert.accessoryView = NSView(frame: NSRect(x: 0, y: 0, width: width, height: 0))
             NSApp.activate(ignoringOtherApps: true)
             alert.runModal()
         }
+    }
+
+    /// Widest line across messageText/informativeText, plus room for the
+    /// icon column and the alert's own margins, clamped to a sane range so
+    /// a single long entry can't blow the window past a reasonable size.
+    private static func accessoryWidth(for messageText: String, informativeText: String) -> CGFloat {
+        let minWidth: CGFloat = 300
+        let maxWidth: CGFloat = 640
+        let horizontalPadding: CGFloat = 70
+
+        let messageFont = NSFont.boldSystemFont(ofSize: NSFont.systemFontSize)
+        let bodyFont = NSFont.systemFont(ofSize: NSFont.smallSystemFontSize)
+
+        var widest = (messageText as NSString).size(withAttributes: [.font: messageFont]).width
+        for line in informativeText.split(separator: "\n", omittingEmptySubsequences: false) {
+            let lineWidth = (String(line) as NSString).size(withAttributes: [.font: bodyFont]).width
+            widest = max(widest, lineWidth)
+        }
+
+        return min(max(widest + horizontalPadding, minWidth), maxWidth)
     }
 
     /// Builds the localized, human-readable block shown for one editor root

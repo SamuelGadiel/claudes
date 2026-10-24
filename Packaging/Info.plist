@@ -12,10 +12,13 @@
     <string>ClaudeS</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
+    <!-- Both overwritten at build time by scripts/build-app.sh, from the
+         project's VERSION file — these are just a placeholder so the key
+         exists for plutil -replace to target. -->
     <key>CFBundleShortVersionString</key>
-    <string>0.1.0</string>
+    <string>0.0.0</string>
     <key>CFBundleVersion</key>
-    <string>1</string>
+    <string>0</string>
     <key>CFBundleIconFile</key>
     <string>AppIcon</string>
     <!-- Required for automatic system-language resolution to work at all —

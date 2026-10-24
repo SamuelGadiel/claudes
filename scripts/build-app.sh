@@ -32,6 +32,17 @@ cp "$RELEASE_DIR/$EXECUTABLE_NAME" "$APP_BUNDLE/Contents/MacOS/$EXECUTABLE_NAME"
 # install-cli` has nothing to point at until the user builds it separately.
 cp "$RELEASE_DIR/cs" "$APP_BUNDLE/Contents/MacOS/cs"
 cp Packaging/Info.plist "$APP_BUNDLE/Contents/Info.plist"
+
+# VERSION (major.minor.patch+build) is the single source of truth — kept
+# out of Info.plist so a version bump never needs a second file edited by
+# hand. CFBundleVersion (the build counter) is what macOS itself compares
+# to decide an update is newer; CFBundleShortVersionString is the
+# user-facing semver shown in Finder/About.
+VERSION_STRING="$(cat VERSION)"
+SHORT_VERSION="${VERSION_STRING%+*}"
+BUILD_NUMBER="${VERSION_STRING##*+}"
+plutil -replace CFBundleShortVersionString -string "$SHORT_VERSION" "$APP_BUNDLE/Contents/Info.plist"
+plutil -replace CFBundleVersion -string "$BUILD_NUMBER" "$APP_BUNDLE/Contents/Info.plist"
 # assets/ is the single source of truth for the icon — Packaging/ only
 # holds build-time metadata (Info.plist), not a second copy of artwork.
 cp assets/ClaudeS.icns "$APP_BUNDLE/Contents/Resources/AppIcon.icns"

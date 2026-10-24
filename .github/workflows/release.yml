@@ -1,0 +1,95 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      increment:
+        description: "Version part to bump (semver: major.minor.patch, build always +1)"
+        required: true
+        type: choice
+        options: [major, minor, patch]
+
+permissions:
+  contents: write
+
+jobs:
+  bump-version:
+    runs-on: macos-15
+    outputs:
+      version: ${{ steps.bump.outputs.version }}
+      tag: ${{ steps.bump.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Bump version
+        id: bump
+        run: |
+          scripts/bump-version.sh "${{ inputs.increment }}"
+          full="$(cat VERSION)"
+          version="${full%+*}"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+
+  build-and-release:
+    needs: bump-version
+    runs-on: macos-15
+    outputs:
+      sha256: ${{ steps.package.outputs.sha256 }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.bump-version.outputs.tag }}
+
+      - name: Build ClaudeS.app
+        run: scripts/build-app.sh
+
+      - name: Package zip and checksum
+        id: package
+        run: |
+          version="${{ needs.bump-version.outputs.version }}"
+          cd dist
+          zip -ry "ClaudeS-$version.zip" ClaudeS.app
+          sha256="$(shasum -a 256 "ClaudeS-$version.zip" | awk '{print $1}')"
+          echo "sha256=$sha256" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="${{ needs.bump-version.outputs.tag }}"
+          gh release create "$tag" \
+            "dist/ClaudeS-${{ needs.bump-version.outputs.version }}.zip" \
+            --title "$tag" \
+            --generate-notes
+
+  update-cask:
+    needs: [bump-version, build-and-release]
+    runs-on: macos-15
+    steps:
+      - name: Checkout homebrew-casks
+        uses: actions/checkout@v4
+        with:
+          repository: SamuelGadiel/homebrew-casks
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+
+      - name: Update Casks/claudes.rb
+        run: |
+          version="${{ needs.bump-version.outputs.version }}"
+          sha256="${{ needs.build-and-release.outputs.sha256 }}"
+          sed -i '' "s/version \".*\"/version \"$version\"/" Casks/claudes.rb
+          sed -i '' "s/sha256 \".*\"/sha256 \"$sha256\"/" Casks/claudes.rb
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Casks/claudes.rb
+          git commit -m "claudes ${{ needs.bump-version.outputs.version }}"
+          git push

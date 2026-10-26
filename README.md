@@ -3,7 +3,7 @@
     <img src="assets/ClaudeS-rounded.png" width="120" height="120" alt="ClaudeS icon"><br>
     ClaudeS
   </h1>
-  <p><strong>Run Claude Code under multiple accounts, side by side, without fighting VS Code over it.</strong></p>
+  <p><strong>Multiple Claude Code accounts, shared chat history, live usage tracking — in the terminal and in VS Code.</strong></p>
 
   ![Platform](https://img.shields.io/badge/platform-macOS%2013%2B-blue?style=flat-square)
   [![Release](https://img.shields.io/github/v/release/SamuelGadiel/claudes?style=flat-square)](https://github.com/SamuelGadiel/claudes/releases/latest)
@@ -14,17 +14,30 @@
 <br>
 
 <p align="center">
-  <img src="assets/screenshots/panel.png" width="340" alt="ClaudeS menu bar panel showing open VS Code projects and account usage">
-  <img src="assets/screenshots/panel-high-usage.png" width="340" alt="ClaudeS panel with session usage above 75%, shown in orange">
+  <a href="https://buymeacoffee.com/samuelgadiel"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png"  height="36" alt="Buy Me a Coffee"></a>
+  &nbsp;
+  <a href="https://ko-fi.com/samuelgadiel"><img src="https://ko-fi.com/img/githubbutton_sm.svg" height="36" alt="Ko-fi"></a>
+  &nbsp;
+  <a href="https://github.com/sponsors/SamuelGadiel"><img src="https://img.shields.io/badge/-Sponsor%20via%20GitHub-181717?style=for-the-badge&logo=github&logoColor=white" height="36" alt="GitHub Sponsors"></a>
+  &nbsp;
+  <a href="https://donate.stripe.com/eVqeVcfNDd30aDK4iE0oM00"><img src="https://img.shields.io/badge/-Donate%20via%20Stripe-635BFF?style=for-the-badge&logo=stripe&logoColor=white" height="36" alt="Donate via Stripe"></a>
+</p>
+
+<br>
+
+<p align="center">
+  <img src="assets/screenshots/panel.png" width="340" align="top" alt="ClaudeS menu bar panel showing open VS Code projects and account usage">
+  <img src="assets/screenshots/panel-high-usage.png" width="340" align="top" alt="ClaudeS panel with session usage above 75%, shown in orange">
+  <img src="assets/screenshots/notifications.png" width="380" align="top" alt="Native notifications for an expired session and usage crossing 75%">
 </p>
 
 ## Why
 
 If you use Claude Code for both a personal and a work account — or more than one of either — you already know the pain: `claude /login` is one credential at a time, VS Code Profiles don't share your extensions or settings between them, and juggling `CLAUDE_CONFIG_DIR` by hand across terminals and editor windows gets old fast.
 
-It gets worse the moment you actually hit a rate limit mid-task: switch accounts the usual way and the new one has no idea what you were just talking about, because each `CLAUDE_CONFIG_DIR` keeps its own session history. The "fix" is copying chat files between folders by hand just to keep working.
+It gets worse the moment you actually hit a rate limit mid-task: switch accounts the usual way and the new one has no idea what you were just talking about, because each `CLAUDE_CONFIG_DIR` keeps its own session history. The "fix" is copying chat files between folders by hand just to keep working. And seeing it coming in the first place meant opening the usage page in a browser, or running a status command and reading through the output, account by account — something you'd only think to do once you were already rate-limited.
 
-ClaudeS sits in your menu bar, keeps every account's credentials isolated, and makes each project remember which account it uses — not just in the terminal, but inside VS Code's own Claude extension too, with zero manual setup per project. Accounts also share the same session history, so running out of quota on one and switching to another never costs you the conversation you were in the middle of.
+ClaudeS sits in your menu bar, keeps every account's credentials isolated, and makes each project remember which account it uses — not just in the terminal, but inside VS Code's own Claude extension too, with zero manual setup per project. Accounts also share the same session history, so running out of quota on one and switching to another never costs you the conversation you were in the middle of. One click on the menu bar icon shows every account's usage, live — no browser, no command to run.
 
 ## Installation
 
@@ -49,7 +62,8 @@ Download the latest `ClaudeS-*.zip` from [Releases](https://github.com/SamuelGad
 - **One default account** for every project that hasn't picked one yet.
 - **Live usage bars** — 5-hour and weekly rate-limit windows per account, with reset times, right in the panel.
 - **Usage notifications** — a native notification fires when an account crosses 75% or 90% of a window, and again once an exhausted window is available again — even with the panel closed, so you're not caught mid-task.
-- **Reliable login status** — backed by `claude auth status`, not fragile direct Keychain reads, so you're not ambushed by a password prompt. A notification fires the moment a session actually expires.
+- **Log in without a terminal** — ClaudeS drives `claude auth login` in the background: it waits for the prompt and lets you paste the code right in the panel, no terminal involved.
+- **Reliable login status** — backed by `claude auth status`, not fragile direct Keychain reads, so you're not ambushed by a password prompt. A notification fires when a session expires, and you can log back in from the same panel.
 - **A full CLI, not an afterthought** — see [Command line](#command-line) below.
 - **Launches at login, installs its own CLI** — open the app once and `cs` is on your `PATH`; no `brew link`, no extra step.
 - **Native and small** — Swift + SwiftUI, no Electron, no background daemon you didn't ask for.
@@ -58,6 +72,10 @@ Download the latest `ClaudeS-*.zip` from [Releases](https://github.com/SamuelGad
 <p align="center">
   <img src="assets/screenshots/accounts-menu.png" width="400" alt="Add, import, or remove an account right from the panel">
   <img src="assets/screenshots/menu.png" width="400" alt="ClaudeS menu bar right-click menu">
+</p>
+<p align="center">
+  <img src="assets/screenshots/add-account.png" width="400" alt="Adding a new account, with its name and slug">
+  <img src="assets/screenshots/account-pending-login.png" width="400" alt="A newly added account that hasn't logged in yet, with its Log In button">
 </p>
 <p align="center">
   <img src="assets/screenshots/patch-verified.png" width="400" alt="VS Code extension patch verification result">

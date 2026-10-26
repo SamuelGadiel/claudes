@@ -1,6 +1,6 @@
 <div align="center">
   <h1>
-    <img src="assets/ClaudeS-rounded.png" width="120" height="120" alt="ClaudeS icon"><br>
+    <img src="assets/ClaudeS-rounded.png" width="160" height="160" alt="ClaudeS icon"><br>
     ClaudeS
   </h1>
   <p><strong>Multiple Claude Code accounts, shared chat history, live usage tracking — in the terminal and in VS Code.</strong></p>

@@ -42,7 +42,7 @@ ClaudeS sits in your menu bar, keeps every account's credentials isolated, and m
 ## Installation
 
 ```sh
-brew install --cask samuelgadiel/casks/claudes
+brew install samuelgadiel/casks/claudes
 ```
 
 Open ClaudeS once from Launchpad — it installs the `cs` command for your shell automatically. No manual PATH setup.

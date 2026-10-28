@@ -63,6 +63,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ needs.bump-version.outputs.tag }}
+          fetch-depth: 0
 
       - name: Build ClaudeS.app
         run: scripts/build-app.sh
@@ -76,12 +77,45 @@ jobs:
           sha256="$(shasum -a 256 "ClaudeS-$version.zip" | awk '{print $1}')"
           echo "sha256=$sha256" >> "$GITHUB_OUTPUT"
 
+      - name: Verify app signature
+        run: |
+          codesign --verify --deep --strict --verbose=2 dist/ClaudeS.app
+          spctl -a -vv dist/ClaudeS.app || true
+
+      - name: Create DMG
+        run: |
+          version="${{ needs.bump-version.outputs.version }}"
+          brew install create-dmg
+          create-dmg \
+            --volname "ClaudeS" \
+            --volicon "assets/ClaudeS.icns" \
+            --window-size 600 400 \
+            --icon-size 100 \
+            --icon "ClaudeS.app" 150 190 \
+            --hide-extension "ClaudeS.app" \
+            --app-drop-link 450 190 \
+            "dist/ClaudeS-$version.dmg" \
+            "dist/ClaudeS.app"
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          tag="${{ needs.bump-version.outputs.tag }}"
+          prev_tag="$(git describe --tags --abbrev=0 "$tag^" 2>/dev/null || true)"
+          if [ -n "$prev_tag" ]; then
+            python3 scripts/generate-changelog.py "$prev_tag" "$tag" "SamuelGadiel/claudes" > release-notes.md
+          else
+            python3 scripts/generate-changelog.py --root "$tag" "SamuelGadiel/claudes" > release-notes.md
+          fi
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.bump-version.outputs.tag }}
-          files: dist/ClaudeS-${{ needs.bump-version.outputs.version }}.zip
-          generate_release_notes: true
+          files: |
+            dist/ClaudeS-${{ needs.bump-version.outputs.version }}.zip
+            dist/ClaudeS-${{ needs.bump-version.outputs.version }}.dmg
+          body_path: release-notes.md
 
   update-cask:
     needs: [bump-version, build-and-release]

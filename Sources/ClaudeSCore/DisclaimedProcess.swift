@@ -139,16 +139,31 @@ public final class DisclaimedProcess {
         pid = spawnedPid
         isRunning = true
 
+        // Reaping must not depend on this instance still being alive: callers
+        // that terminate()/forceTerminate() and then immediately drop their
+        // reference (e.g. a local `process` var going out of scope at
+        // function return, or a stored property set to nil right after
+        // cancel()) would otherwise leave the already-exited child
+        // unreaped — a zombie stuck to this app until it quits. Confirmed:
+        // without this, `[weak self]` resolves to nil by the time the exit
+        // event fires, so `waitpid` is skipped entirely.
+        // `selfRetainingSource` captures itself strongly through its own
+        // event handler, keeping the DispatchSourceProcess alive independent
+        // of `self` until it has actually fired and reaped the child.
+        var selfRetainingSource: DispatchSourceProcess?
         let source = DispatchSource.makeProcessSource(identifier: spawnedPid, eventMask: .exit, queue: .main)
         source.setEventHandler { [weak self] in
-            guard let self else { return }
             var status: Int32 = 0
             waitpid(spawnedPid, &status, 0)
-            self.terminationStatus = (status >> 8) & 0xFF
-            self.isRunning = false
-            self.monitorSource = nil
-            self.terminationHandler?(self)
+            if let self {
+                self.terminationStatus = (status >> 8) & 0xFF
+                self.isRunning = false
+                self.monitorSource = nil
+                self.terminationHandler?(self)
+            }
+            selfRetainingSource = nil
         }
+        selfRetainingSource = source
         source.resume()
         monitorSource = source
     }
